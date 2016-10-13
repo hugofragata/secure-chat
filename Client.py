@@ -1,6 +1,6 @@
 import sys
 from PyQt4 import QtCore, QtGui
-
+from loginDialog import *
 import t
 try:
     _fromUtf8 = QtCore.QString.fromUtf8
@@ -13,8 +13,12 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
     def __init__(self, parent=None):
         super(AppChat, self).__init__(parent)
         self.setupUi(self)
+        self.login_dialog = QtGui.QDialog()
+        diag_ui = Ui_Dialog()
+        diag_ui.setupUi(self.login_dialog)
         self.sendButton.clicked.connect(self.sendMsg)
         self.msgBox.installEventFilter(self)
+        self.login_dialog.exec_()
 
     def sendMsg(self):
         text = self.msgBox.toPlainText()
