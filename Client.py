@@ -1,6 +1,6 @@
 import sys
-from PyQt4 import QtCore, QtGui
 from loginDialog import *
+import socket
 import t
 try:
     _fromUtf8 = QtCore.QString.fromUtf8
@@ -19,18 +19,20 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
         self.sendButton.clicked.connect(self.sendMsg)
         self.msgBox.installEventFilter(self)
         self.login_dialog.exec_()
+        self.sock = socket.create_connection(("localhost",8080))
+
 
     def sendMsg(self):
         text = self.msgBox.toPlainText()
         self.textBrowser.append(text)
         self.msgBox.clear()
+        self.sock.send(text+"\n\n")
         #callback()texto
 
     def updateChat(self, text):
         self.textBrowser.append(text)
-        #TODO: append das vefiricacoes
+        #TODO: append das verificacoes
         pass
-
 
     def eventFilter(self, obj, event):
         if event.type() == QtCore.QEvent.KeyPress and obj == self.msgBox:

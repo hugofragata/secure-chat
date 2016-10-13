@@ -65,7 +65,7 @@ class Client:
                 (self, len(self.bufin) + len(data), MAX_BUFSIZE))
             self.bufin = ""
 
-        self.bufin += data
+        self.bufin += data #FIXME: overwrite?
         reqs = self.bufin.split(TERMINATOR)
         print reqs
         self.bufin = reqs[-1]
@@ -265,7 +265,7 @@ class Server:
                 return
 
             if req['type'] == 'ack':
-                return  # Ignore for now
+                return  # TODO: Ignore for now
 
             client.send({'type': 'ack'})
 

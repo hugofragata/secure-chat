@@ -73,7 +73,7 @@
           </widget>
          </item>
          <item>
-          <widget class="QPlainTextEdit" name="plainTextEdit">
+          <widget class="QLineEdit" name="lineEdit_2">
            <property name="sizePolicy">
             <sizepolicy hsizetype="Expanding" vsizetype="Minimum">
              <horstretch>0</horstretch>
@@ -91,6 +91,9 @@
              <width>16777215</width>
              <height>30</height>
             </size>
+           </property>
+           <property name="maxLength">
+            <number>500</number>
            </property>
           </widget>
          </item>
@@ -130,15 +133,18 @@
           </widget>
          </item>
          <item>
-          <widget class="QPlainTextEdit" name="plainTextEdit_3">
-           <property name="enabled">
-            <bool>true</bool>
-           </property>
+          <widget class="QLineEdit" name="lineEdit">
            <property name="sizePolicy">
             <sizepolicy hsizetype="Expanding" vsizetype="Minimum">
              <horstretch>0</horstretch>
              <verstretch>0</verstretch>
             </sizepolicy>
+           </property>
+           <property name="minimumSize">
+            <size>
+             <width>0</width>
+             <height>30</height>
+            </size>
            </property>
            <property name="maximumSize">
             <size>
@@ -146,8 +152,11 @@
              <height>30</height>
             </size>
            </property>
-           <property name="autoFillBackground">
-            <bool>false</bool>
+           <property name="inputMethodHints">
+            <set>Qt::ImhDigitsOnly</set>
+           </property>
+           <property name="maxLength">
+            <number>200</number>
            </property>
           </widget>
          </item>
@@ -179,7 +188,7 @@
           <number>0</number>
          </property>
          <item>
-          <widget class="QPlainTextEdit" name="plainTextEdit_2">
+          <widget class="QLineEdit" name="lineEdit_3">
            <property name="maximumSize">
             <size>
              <width>16777215</width>
@@ -210,7 +219,24 @@
   </layout>
  </widget>
  <resources/>
- <connections/>
+ <connections>
+  <connection>
+   <sender>pushButton</sender>
+   <signal>clicked()</signal>
+   <receiver>Dialog</receiver>
+   <slot>accept()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>314</x>
+     <y>167</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>354</x>
+     <y>145</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
  <slots>
   <slot>connectPressed()</slot>
  </slots>
