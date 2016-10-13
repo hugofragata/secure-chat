@@ -23,12 +23,19 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
     def sendMsg(self):
         text = self.msgBox.toPlainText()
         self.textBrowser.append(text)
+        self.msgBox.clear()
+        #callback()texto
+
+    def updateChat(self, text):
+        self.textBrowser.append(text)
+        #TODO: append das vefiricacoes
+        pass
+
 
     def eventFilter(self, obj, event):
         if event.type() == QtCore.QEvent.KeyPress and obj == self.msgBox:
             if event.key() == QtCore.Qt.Key_Return:
                 self.sendMsg()
-                self.msgBox.clear()
                 return True
         return QtGui.QMainWindow.eventFilter(self, obj, event)
 
