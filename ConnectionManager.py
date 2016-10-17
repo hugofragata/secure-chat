@@ -7,6 +7,10 @@ class connection_manager:
         self.port = port
         self.s = socket.socket(
             socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            self.connect()
+        except:
+            raise StandardError
 
     def connect(self):
         try:
