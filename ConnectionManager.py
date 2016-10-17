@@ -7,13 +7,15 @@ class connection_manager:
         self.port = port
         self.s = socket.socket(
             socket.AF_INET, socket.SOCK_STREAM)
+
+    def connect(self):
         try:
             self.s.bind((self.ip, self.port))
         except:
-            #TODO: re-instantiate loginDialog and inform user of the error
-            pass
+            return False
         #TODO: inform server of who we are and prove it
-        
+        return True
+
 
     def disconnect_from_server(self):
         pass
