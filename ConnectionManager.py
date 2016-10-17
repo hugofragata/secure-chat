@@ -1,25 +1,20 @@
 import socket
 
-class connection_manager:
 
+class ConnectionManager:
     def __init__(self, ip, port):
-        self.ip = ip
-        self.port = port
-        self.s = socket.socket(
-            socket.AF_INET, socket.SOCK_STREAM)
+        #self.ip = ip
+        #self.port = port
+        #self.s = socket.socket(
+        #    socket.AF_INET, socket.SOCK_STREAM)
         try:
-            self.connect()
+            self.s = socket.create_connection((ip, port))
         except:
-            raise StandardError
+            raise socket.error
 
     def connect(self):
-        try:
-            self.s.bind((self.ip, self.port))
-        except:
-            return False
         #TODO: inform server of who we are and prove it
         return True
-
 
     def disconnect_from_server(self):
         pass
@@ -55,3 +50,14 @@ class connection_manager:
     def send_ack_msg_read(self, msg_id):
         pass
 
+    @staticmethod
+    def is_ip_address(ip):
+        try:
+            socket.inet_aton(ip)
+            return True
+        except socket.error:
+            return False
+
+
+class ConnectionManagerError(Exception):
+    pass
