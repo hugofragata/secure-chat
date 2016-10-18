@@ -20,28 +20,38 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
         self.diag_ui.pushButton.clicked.connect(self.login)
         self.sendButton.clicked.connect(self.sendMsg)
         self.msgBox.installEventFilter(self)
-        teste = self.login_dialog.exec_()
-        if teste == 0:
+        accept = self.login_dialog.exec_()
+        if accept == 0:
             quit()
-        #self.sock = socket.create_connection(("localhost", 8080))
 
     def login(self):
+        QtGui.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
         address = str(self.diag_ui.address.text())
         port = str(self.diag_ui.port.text())
         username = str(self.diag_ui.userName.text())
         if address and port and username:
             if not ConnectionManager.is_ip_address(address):
+                QtGui.QApplication.restoreOverrideCursor()
                 return
             if not self.valid_port(port):
+                QtGui.QApplication.restoreOverrideCursor()
                 return
             try:
                 self.comm = ConnectionManager(address, port)
             except ConnectionManagerError:
+                QtGui.QApplication.restoreOverrideCursor()
+                errorDiag = QtGui.QMessageBox()
+                errorDiag.setIcon(QtGui.QMessageBox.Critical)
+                errorDiag.setText("Connection ERROR")
+                errorDiag.setWindowTitle("Error")
+                errorDiag.setStandardButtons(QtGui.QMessageBox.Ok)
+                errorDiag.exec_()
                 return
             else:
+                QtGui.QApplication.restoreOverrideCursor()
                 return self.login_dialog.accept()
         else:
-            #lineEdits vazios
+            QtGui.QApplication.restoreOverrideCursor()
             return
 
     def sendMsg(self):

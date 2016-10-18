@@ -5,6 +5,8 @@ class ConnectionManager:
     def __init__(self, ip, port):
         try:
             self.s = socket.create_connection((ip, port))
+            while True:
+                print "ola"
         except:
             raise ConnectionManagerError
 
