@@ -3,14 +3,10 @@ import socket
 
 class ConnectionManager:
     def __init__(self, ip, port):
-        #self.ip = ip
-        #self.port = port
-        #self.s = socket.socket(
-        #    socket.AF_INET, socket.SOCK_STREAM)
         try:
             self.s = socket.create_connection((ip, port))
         except:
-            raise socket.error
+            raise ConnectionManagerError
 
     def connect(self):
         #TODO: inform server of who we are and prove it

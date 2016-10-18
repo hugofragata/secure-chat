@@ -1,6 +1,6 @@
 import sys
 from loginDialog import *
-from ConnectionManager import ConnectionManager, ConnectionManagerError
+import socket
 import t
 try:
     _fromUtf8 = QtCore.QString.fromUtf8
@@ -12,41 +12,23 @@ except AttributeError:
 class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
     def __init__(self, parent=None):
         super(AppChat, self).__init__(parent)
-        self.comm = None
         self.setupUi(self)
         self.login_dialog = QtGui.QDialog()
-        self.diag_ui = Ui_Dialog()
-        self.diag_ui.setupUi(self.login_dialog)
-        self.diag_ui.pushButton.clicked.connect(self.login)
+        diag_ui = Ui_Dialog()
+        diag_ui.setupUi(self.login_dialog)
         self.sendButton.clicked.connect(self.sendMsg)
         self.msgBox.installEventFilter(self)
-        teste = self.login_dialog.exec_()
-        #self.sock = socket.create_connection(("localhost", 8080))
+        self.login_dialog.exec_()
+        self.sock = socket.create_connection(("localhost",8080))
 
-    def login(self):
-        address = str(self.diag_ui.address.text())
-        port = str(self.diag_ui.port.text())
-        username = str(self.diag_ui.userName.text())
-        if address and port and username:
-            if not ConnectionManager.is_ip_address(address):
-                return
-            if not self.valid_port(port):
-                return
-            try:
-                self.comm = ConnectionManager(address, port)
-            except ConnectionManagerError:
-                return
-            finally:
-                return self.login_dialog.accept()
-        else:
-            #lineEdits vazios
-            return
 
     def sendMsg(self):
         text = self.msgBox.toPlainText()
+        if not text or text=="\n":
+            return
         self.textBrowser.append(text)
-        self.comm.send_message(text)
         self.msgBox.clear()
+        self.sock.send(text+"\n\n")
 
     def updateChat(self, text):
         self.textBrowser.append(text)
@@ -59,17 +41,6 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
                 self.sendMsg()
                 return True
         return QtGui.QMainWindow.eventFilter(self, obj, event)
-
-    @staticmethod
-    def valid_port(s):
-        try:
-            p = int(s)
-            if 0 < p <= 65535:
-                return True
-            else:
-                return False
-        except ValueError:
-            return False
 
 
 def main():
