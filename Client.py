@@ -37,7 +37,7 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
                 QtGui.QApplication.restoreOverrideCursor()
                 return
             try:
-                self.comm = ConnectionManager(address, port)
+                self.comm = ConnectionManager(address, port, self)
             except ConnectionManagerError:
                 QtGui.QApplication.restoreOverrideCursor()
                 errorDiag = QtGui.QMessageBox()
@@ -56,14 +56,15 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
 
     def sendMsg(self):
         text = self.msgBox.toPlainText()
-        if not text or text=="\n":
+        if not text or text == "\n":
             return
         self.textBrowser.append(text)
         self.comm.send_message(text)
         self.msgBox.clear()
 
     def updateChat(self, text):
-        self.textBrowser.append(text)
+        self.textBrowser.append("<span>" + _fromUtf8(text) + "</span>")
+        print self.textBrowser.toPlainText()
         #TODO: append das verificacoes
         pass
 

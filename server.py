@@ -65,7 +65,7 @@ class Client:
                 (self, len(self.bufin) + len(data), MAX_BUFSIZE))
             self.bufin = ""
 
-        self.bufin += data #FIXME: overwrite?
+        self.bufin += data
         reqs = self.bufin.split(TERMINATOR)
         print reqs
         self.bufin = reqs[-1]
@@ -192,6 +192,7 @@ class Server:
             self.delClient(s)
         else:
             if len(data) > 0:
+                client.bufout += data
                 reqs = client.parseReqs(data)
                 for req in reqs:
                     self.handleRequest(s, req)
