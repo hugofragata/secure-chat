@@ -100,5 +100,73 @@ class ConnectionManager(QtCore.QThread):
             return False
 
 
+    def form_json(self, type, src=None, dst=None, data=None, name=None, phase=None, ciphers=None, sa_data=None, id=None,
+                  payload=None):
+        j = None
+        try:
+            if type == "connect":
+                j = json.dumps(
+                    {"type": type, "phase": int(phase), "name": name, "id": id, "ciphers": ciphers, "data": data})
+
+            elif type == "secure":
+                j = json.dumps({"type": type, "sa-data": sa_data, "payload": payload})
+
+            elif type == "list":
+                j = json.dumps({"type": type, "data": data})
+
+            elif type == "client-connect":
+                j = json.dumps({"type": type, "src": src, "dst": dst, "phase": phase, "ciphers": ciphers, "data": data})
+
+            elif type == "client-disconnect" or type == "ack" or type == "client-com":
+                j = json.dumps({"type": type, "src": src, "dst": dst, "data": data})
+        except:
+            raise ConnectionManagerError
+        return j
+
+
+    def form_json_connect(self, type, phase, name, id, ciphers, data):
+        if not type or not phase or not name or not id or not ciphers or not data:
+            raise json.error
+        return json.dumps(
+            {"type": "connect", "phase": int(phase), "name": name, "id": id, "ciphers": ciphers, "data": data})
+
+
+    def form_json_secure(self, type, sa_data, payload):
+        if not type or not sa_data or not payload:
+            raise json.error
+        return json.dumps({"type": "secure", "sa-data": sa_data, "payload": payload})
+
+
+    def form_json_list(self, type, data):
+        if not type or not data:
+            raise json.error
+        return json.dumps({"type": "list", "data": data})
+
+
+    def form_json_client_connect(self, type, src, dst, phase, ciphers, data):
+        if not type or not data:
+            raise json.error
+        return json.dumps(
+            {"type": "client-connect", "src": src, "dst": dst, "phase": phase, "ciphers": ciphers, "data": data})
+
+
+    def form_json_client_disconnect(self, type, src, dst, data):
+        if not type or not data:
+            raise json.error
+        return json.dumps({"type": "client-disconnect", "src": src, "dst": dst, "data": data})
+
+
+    def form_json_ack(self, type, src, dst, data):
+        if not type or not data:
+            raise json.error
+        return json.dumps({"type": "ack", "src": src, "dst": dst, "data": data})
+
+
+    def form_json_client_com(self, type, src, dst, data):
+        if not type or not data:
+            raise json.error
+        return json.dumps({"type": "client-com", "src": src, "dst": dst, "data": data})
+
+
 class ConnectionManagerError(Exception):
     pass
