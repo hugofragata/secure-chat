@@ -15,7 +15,7 @@ import logging
 
 # Server address
 HOST = ""   # All available interfaces
-PORT = 8080  # The server port
+PORT = 8081  # The server port
 
 BUFSIZE = 512 * 1024
 TERMINATOR = "\n\n"
