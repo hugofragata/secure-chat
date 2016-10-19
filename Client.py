@@ -1,3 +1,4 @@
+# encoding: utf-8
 import sys
 from loginDialog import *
 from ConnectionManager import ConnectionManager, ConnectionManagerError
@@ -48,6 +49,7 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
                 errorDiag.exec_()
                 return
             else:
+                self.connect(self.comm, self.comm.signal, self.updateChat)
                 QtGui.QApplication.restoreOverrideCursor()
                 return self.login_dialog.accept()
         else:
@@ -63,8 +65,11 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
         self.msgBox.clear()
 
     def updateChat(self, text):
-        self.textBrowser.append("<span>" + _fromUtf8(text) + "</span>")
-        print self.textBrowser.toPlainText()
+        print "recebi"
+        #problemas com o encoding da string
+        ola = text
+        self.textBrowser.append("<span>" + _fromUtf8(ola) + "</span>")
+        #print self.textBrowser.toPlainText()
         #TODO: append das verificacoes
         pass
 

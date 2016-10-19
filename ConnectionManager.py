@@ -1,24 +1,59 @@
+# encoding: utf-8
 import socket
 from select import *
 import thread
-
+from PyQt4 import QtCore
 BUFSIZE = 512 * 1024
 
 
-class ConnectionManager:
+class ConnectionManager(QtCore.QThread):
     def __init__(self, ip, port, gui):
         self.gui = gui
         self.out_buffer = ""
         self.in_buffer = ""
+        QtCore.QThread.__init__(self, parent = self.gui)
+        self.signal = QtCore.SIGNAL("newMsg")
         try:
             self.s = socket.create_connection((ip, port))
         except:
             raise ConnectionManagerError
         else:
-            thread.start_new_thread(self.main_loop, ())
+            self.start()
 
+    def run(self):
+        while True:
+            # we only have one socket to read from
+            rlist = [self.s]
+            #if we have something to write add the socket to the write list
+            #ugly but works :^)
+            wlist = [s for s in rlist if len(self.out_buffer) > 0]
+            #wait
+            (rl, wl, xl) = select(rlist, wlist, rlist)
+            data = None
+            if rl:
+                #handle incoming data
+                try:
+                    data = self.s.recv(BUFSIZE)
+                except:
+                    #error
+                    pass
+                else:
+                    if len(data) > 0:
+                        #must send signal to gui this way doesn't work
+                        #JUST
+                        self.emit(self.signal, data)
 
-    def connect(self):
+            if wl:
+                try:
+                    sent = self.s.send(self.out_buffer[:BUFSIZE])
+                    self.out_buffer = self.out_buffer[sent:]  # leave remaining to be sent later
+                except:
+                    pass
+            if xl:
+                pass
+                #error??
+
+    def s_connect(self):
         #TODO: inform server of who we are and prove it
         return True
 
@@ -55,40 +90,6 @@ class ConnectionManager:
 
     def send_ack_msg_read(self, msg_id):
         pass
-    def main_loop(self):
-        while True:
-            # we only have one socket to read from
-            rlist = [self.s]
-            #if we have something to write add the socket to the write list
-            #ugly but works :^)
-            wlist = [s for s in rlist if len(self.out_buffer) > 0]
-            #wait
-            (rl, wl, xl) = select(rlist, wlist, rlist)
-            data = None
-            if rl:
-                #handle incoming data
-                try:
-                    data = self.s.recv(BUFSIZE)
-                except:
-                    #error
-                    pass
-                else:
-                    if len(data) > 0:
-                        #must send signal to gui this way doesn't work
-                        #JUST
-                        self.gui.updateChat(data)
-
-            if wl:
-                try:
-                    sent = self.s.send(self.out_buffer[:BUFSIZE])
-                    self.out_buffer = self.out_buffer[sent:]  # leave remaining to be sent later
-                except:
-                    pass
-            if xl:
-                pass
-                #error??
-
-
 
     @staticmethod
     def is_ip_address(ip):
