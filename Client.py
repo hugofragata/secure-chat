@@ -65,10 +65,7 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
         self.msgBox.clear()
 
     def updateChat(self, text):
-        print "recebi"
-        #problemas com o encoding da string
-        ola = text
-        self.textBrowser.append("<span>" + _fromUtf8(ola) + "</span>")
+        self.textBrowser.append("<span>" + QtCore.QString.fromLatin1(text, len(text)) + "</span>")
         #print self.textBrowser.toPlainText()
         #TODO: append das verificacoes
         pass
