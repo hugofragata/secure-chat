@@ -61,12 +61,11 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
         if not text or text == "\n":
             return
         self.textBrowser.append(text)
-        self.comm.send_message(text)
+        self.comm.send_message(text + "\n\n")
         self.msgBox.clear()
 
     def updateChat(self, text):
         self.textBrowser.append("<span>" + QtCore.QString.fromLatin1(text, len(text)) + "</span>")
-        #print self.textBrowser.toPlainText()
         #TODO: append das verificacoes
         pass
 
