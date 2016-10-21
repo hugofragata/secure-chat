@@ -192,7 +192,6 @@ class Server:
             self.delClient(s)
         else:
             if len(data) > 0:
-                client.bufout += data
                 reqs = client.parseReqs(data)
                 for req in reqs:
                     self.handleRequest(s, req)
@@ -303,12 +302,15 @@ class Server:
 
         if len(request['ciphers']) > 1 or 'NONE' not in request['ciphers']:
             logging.info("Connect continue to phase " + msg['phase'])
-            client.send(msg)
+            if request['ciphers'] == "RSA":
+                pass
+            sender.send(msg)
             return
 
         self.id2client[request['id']] = sender
         sender.id = request['id']
         sender.name = request['name']
+        sender.level = 1
         sender.state = STATE_CONNECTED
         logging.info("Client %s Connected" % request['id'])
 

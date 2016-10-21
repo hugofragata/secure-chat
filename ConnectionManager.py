@@ -1,17 +1,36 @@
 # encoding: utf-8
 import socket
 from select import *
-import thread
+import threading
 from PyQt4 import QtCore
+import cryptography
+from cryptography.fernet import Fernet
+import os.path
+import base64
 BUFSIZE = 512 * 1024
 
 
 class ConnectionManager(QtCore.QThread):
     def __init__(self, ip, port, gui):
+        self.event = threading.Event()
+        self.event.set()
         self.gui = gui
         self.out_buffer = ""
         self.in_buffer = ""
+        if os.path.isfile("teste.txt"):
+            with open("teste.txt", "r") as f:
+                key = f.read()
+                self.fern = Fernet(bytes(key))
+                del key
+        else:
+            key = Fernet.generate_key()
+            with open("teste.txt", 'w') as f:
+                f.write(key)
+            self.fern = Fernet(key)
+            del key
+
         QtCore.QThread.__init__(self, parent = self.gui)
+
         self.signal = QtCore.SIGNAL("newMsg")
         try:
             self.s = socket.create_connection((ip, port))
@@ -26,9 +45,9 @@ class ConnectionManager(QtCore.QThread):
             rlist = [self.s]
             #if we have something to write add the socket to the write list
             #ugly but works :^)
-            wlist = [s for s in rlist if len(self.out_buffer) > 0]
-            #wait
-            (rl, wl, xl) = select(rlist, wlist, rlist)
+            wlist = [s for s in rlist if len(self.out_buffer)>0]
+            #must have timeout or it will wait forever until we get a msg from the server
+            (rl, wl, xl) = select(rlist, wlist, rlist, 1)
             data = None
             if rl:
                 #handle incoming data
@@ -39,16 +58,26 @@ class ConnectionManager(QtCore.QThread):
                     pass
                 else:
                     if len(data) > 0:
-                        #must send signal to gui this way doesn't work
-                        #JUST
-                        self.emit(self.signal, data)
+                        print data
+                        clear_msg = self.fern.decrypt(bytes(data))
+                        clear_msg = base64.decodestring(clear_msg)
+                        print "clear text"
+                        print clear_msg
+                        self.emit(self.signal, clear_msg)
 
-            if wl:
+            #sync
+            if wl and len(self.out_buffer) > 0:
                 try:
+                    self.event.wait()
+                    self.event.clear()
                     sent = self.s.send(self.out_buffer[:BUFSIZE])
                     self.out_buffer = self.out_buffer[sent:]  # leave remaining to be sent later
                 except:
                     pass
+                finally:
+                    self.event.set()
+            #/sync
+
             if xl:
                 pass
                 #error??
@@ -61,6 +90,12 @@ class ConnectionManager(QtCore.QThread):
         pass
 
     def send_message(self, text):
+        to_send = self.fern.encrypt(bytes(base64.encodestring(text)))
+        self.event.wait()
+        self.event.clear()
+        self.out_buffer += to_send + "\n\n"
+        self.event.set()
+        """"
         total_sent = 0
 
         #TODO: format text to comply with server's protocol
@@ -71,6 +106,7 @@ class ConnectionManager(QtCore.QThread):
             if sent == 0:
                 raise RuntimeError("socket connection broken")
             total_sent = total_sent + sent
+        """
 
 
     def get_messages(self, user):
