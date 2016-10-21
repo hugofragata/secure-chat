@@ -31,7 +31,6 @@ class User:
         self.private_key = rsa.generate_private_key(65537, 4096, default_backend())
         self.public_key = self.private_key.public_key()
 
-
     def gen_client_random(self):
         return ''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(32))
 
