@@ -302,8 +302,8 @@ class Server:
 
         if len(request['ciphers']) > 1 or 'NONE' not in request['ciphers']:
             logging.info("Connect continue to phase " + msg['phase'])
-            if request['ciphers'] == "RSA":
-                pass
+            if request['ciphers'] == "RSA_FERNET":
+                msg = {'type': 'connect', 'phase': request['phase'] + 1, 'name': "server", 'id': time.time(), 'ciphers': ['RSA_FERNET']}
             sender.send(msg)
             return
 
