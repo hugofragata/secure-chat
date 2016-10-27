@@ -6,8 +6,10 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.serialization import load_pem_public_key
+from cryptography.fernet import Fernet
 import string
 from hashlib import sha256
+import base64
 
 path_to_key = "./key.pem"
 
@@ -17,16 +19,20 @@ class security:
         self.private_key = None
         self.public_key = None
 
+
 ################
 #Assymetric cryptography functions
 ################
 
     def gen_key_pair(self):
+
         priv_key = rsa.generate_private_key(65537, 4096, default_backend())
         pub_key = priv_key.public_key()
+
         return (priv_key, pub_key)
 
     def load_key_pair(self, path_to_key):
+
         with open(path_to_key, "rb") as key_file:
             priv_key = serialization.load_pem_private_key(
             key_file.read(),
@@ -34,18 +40,28 @@ class security:
             backend = default_backend())
 
         pub_key = priv_key.public_key()
+
         return (priv_key, pub_key)
 
     def sign_with_private_key(self, text):
-        if not self.private_key:
+
+        if not self.private_key or not text:
             raise security_error
-        signer = private_key.signer(padding.PSS(mgf = padding.MGF1(hashes.SHA256()),salt_length = padding.PSS.MAX_LENGTH),hashes.SHA256())
+
+        signer = private_key.signer(
+            padding.PSS(
+                mgf = padding.MGF1(hashes.SHA256()),
+                salt_length = padding.PSS.MAX_LENGTH)
+            ,hashes.SHA256())
+
         message = str(text)
         signer.update(message)
         signature = signer.finalize()
+
         return signature
 
     def verify_with_public_key(self, signature, public_pem_data):
+
         if not signature or not public_pem_data:
             raise security_error
 
@@ -72,6 +88,16 @@ class security:
 # Symmetric cryptography functions
 ################
 
+    def generate_key_symmetric(self):
+        return Fernet.generate_key()
+
+    def encrypt(self, text, key):
+        f = Fernet(key)
+        return  f.encrypt(bytes(base64.encodestring(text)))
+
+    def decrypt(self, text, key):
+        f = Fernet(key)
+        return f.decrypt(bytes(base64.decodestring(text)))
 
 
 
