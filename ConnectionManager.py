@@ -4,7 +4,7 @@ from select import *
 import threading
 import time
 from PyQt4 import QtCore
-from cryptography.fernet import Fernet
+from security import *
 import base64
 import json
 BUFSIZE = 512 * 1024
@@ -113,6 +113,19 @@ class ConnectionManager(QtCore.QThread):
     def process_connect(self, req):
         if self.connect_state < 1:
             return
+        if req['ciphers'] != SUPPORTED_CIPHER_SUITE:
+            raise ConnectionManagerError
+        if len(req['data']) < 1:
+            return
+        if self.connect_state == 1:
+            server_pubkey = req['data']
+            sym_key = security.generate_key_symmetric()
+            #security.
+
+
+
+
+
 
 
     def process_secure(self, req):
@@ -157,32 +170,21 @@ class ConnectionManager(QtCore.QThread):
             raise json.error
         return json.dumps({"type": "list", "data": data})
 
-    def form_json_client_connect(self, type, src, dst, phase, ciphers, data):
-        if not type or not data:
-
     def form_json_client_connect(self, src, dst, phase, ciphers, data):
         if not src or not data or not dst or not phase or not ciphers or not data:
             raise json.error
         return json.dumps(
             {"type": "client-connect", "src": src, "dst": dst, "phase": phase, "ciphers": ciphers, "data": data})
 
-    def form_json_client_disconnect(self, type, src, dst, data):
-
     def form_json_client_disconnect(self, src, dst, data):
         if not type or not data:
             raise json.error
         return json.dumps({"type": "client-disconnect", "src": src, "dst": dst, "data": data})
 
-    def form_json_ack(self, type, src, dst, data):
-        if not type or not data:
-
     def form_json_ack(self, src, dst, data):
         if not src or not data or not dst:
             raise json.error
         return json.dumps({"type": "ack", "src": src, "dst": dst, "data": data})
-
-    def form_json_client_com(self, type, src, dst, data):
-        if not type or not data:
 
     def form_json_client_com(self, src, dst, data):
         if not src or not data or not dst:
