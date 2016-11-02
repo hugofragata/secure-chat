@@ -44,7 +44,7 @@ class security:
 
         return (priv_key, pub_key)
 
-    def sign_with_private_key(self, text):
+    def sign_with_private_key(self, text, private_key):
 
         if not self.private_key or not text:
             raise security_error
@@ -52,8 +52,8 @@ class security:
         signer = private_key.signer(
             padding.PSS(
                 mgf = padding.MGF1(hashes.SHA256()),
-                salt_length = padding.PSS.MAX_LENGTH)
-            ,hashes.SHA256())
+                salt_length = padding.PSS.MAX_LENGTH),
+                hashes.SHA256())
 
         message = str(text)
         signer.update(message)
@@ -61,12 +61,12 @@ class security:
 
         return signature
 
-    def verify_with_public_key(self, signature, public_pem_data):
+    def verify_with_public_key(self, signature, public_key):
 
-        if not signature or not public_pem_data:
+        if not signature or not public_key:
             raise security_error
 
-        public_key = load_pem_public_key(public_pem_data, backend=default_backend())
+        #public_key = load_pem_public_key(public_pem_data, backend=default_backend())
 
         if not isinstance(public_key, rsa.RSAPublicKey):
             raise security_error
@@ -85,6 +85,24 @@ class security:
         else:
             return True
 
+    def encrypt_with_public_key(self, text, public_key):
+        cipher_text = public_key.encrypt(text,
+                                        padding.OAEP(
+                                            mgf = padding.MGF1(algorithm=hashes.SHA1()),
+                                            algorithm = hashes.SHA1,
+                                            label = None))
+        return cipher_text
+
+    def decrypt_with_private_key(self, text, private_key):
+        plain_text = public_key.encrypt(text,
+                                        padding.OAEP(
+                                            mgf=padding.MGF1(algorithm=hashes.SHA1()),
+                                            algorithm=hashes.SHA1,
+                                            label=None))
+        return plain_text
+
+
+
 ################
 # Symmetric cryptography functions
 ################
@@ -92,11 +110,11 @@ class security:
     def generate_key_symmetric(self):
         return Fernet.generate_key()
 
-    def encrypt(self, text, key):
+    def encrypt_with_symmetric(self, text, key):
         f = Fernet(key)
         return  f.encrypt(bytes(base64.encodestring(text)))
 
-    def decrypt(self, text, key):
+    def decrypt_with_symmetric(self, text, key):
         f = Fernet(key)
         return f.decrypt(bytes(base64.decodestring(text)))
 

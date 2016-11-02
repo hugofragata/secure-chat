@@ -33,7 +33,7 @@ class ConnectionManager(QtCore.QThread):
             # we only have one socket to read from
             rlist = [self.s]
             #if we have something to write add the socket to the write list
-            #ugly but works :^)
+            #ugly but works :^) // :3 // :~]
             wlist = [s for s in rlist if len(self.out_buffer)>0]
             #must have timeout or it will wait forever until we get a msg from the server
             (rl, wl, xl) = select(rlist, wlist, rlist, 1)
