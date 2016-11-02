@@ -13,6 +13,7 @@ import base64
 
 path_to_key = "./key.pem"
 
+CIPHER_SUITE = "RSA_WITH_AES_128_CBC_SHA256"
 
 class security:
 
@@ -118,6 +119,16 @@ class security:
         f = Fernet(key)
         return f.decrypt(bytes(base64.decodestring(text)))
 
+    def derive_symmetric_key(self, original_key):
+        salt = os.urandom(16)
+        kdf = PBKDF2HMAC(
+            algorithm = hashes.SHA256(),
+            length = 32,
+            salt = salt,
+            iterations = 100000,
+            backend = default_backend())
+        key = base64.urlsafe_b64encode(kdf.derive(original_key))
+        return (Fernet(key), str(salt))
 
 
 class security_error:
