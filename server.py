@@ -5,7 +5,7 @@
 
 # vim setings:
 # :set expandtab ts=4
-
+import server_crypt_utils
 from socket import *
 from select import *
 import json
@@ -303,7 +303,8 @@ class Server:
         if len(request['ciphers']) > 1 or 'NONE' not in request['ciphers']:
             logging.info("Connect continue to phase " + msg['phase'])
             if request['ciphers'] == "RSA_FERNET":
-                msg = {'type': 'connect', 'phase': request['phase'] + 1, 'name': "server", 'id': time.time(), 'ciphers': ['RSA_FERNET']}
+                certificate = server_crypt_utils.get_certificate()
+                msg = {'type': 'connect', 'phase': request['phase'] + 1, 'name': "server", 'id': time.time(), 'ciphers': ['RSA_FERNET'], 'data': certificate}
             sender.send(msg)
             return
 

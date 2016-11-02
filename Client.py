@@ -3,6 +3,7 @@ import sys
 from loginDialog import *
 from ConnectionManager import ConnectionManager, ConnectionManagerError
 import t
+from User import User
 try:
     _fromUtf8 = QtCore.QString.fromUtf8
 except AttributeError:
@@ -37,8 +38,9 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
             if not self.valid_port(port):
                 QtGui.QApplication.restoreOverrideCursor()
                 return
+            user = User(username)
             try:
-                self.comm = ConnectionManager(address, port, self)
+                self.comm = ConnectionManager(address, port, self, user)
             except ConnectionManagerError:
                 QtGui.QApplication.restoreOverrideCursor()
                 errorDiag = QtGui.QMessageBox()
@@ -50,6 +52,7 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
                 return
             else:
                 self.connect(self.comm, self.comm.signal, self.updateChat)
+                self.comm.s_connect()
                 QtGui.QApplication.restoreOverrideCursor()
                 return self.login_dialog.accept()
         else:

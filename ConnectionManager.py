@@ -2,35 +2,24 @@
 import socket
 from select import *
 import threading
+import time
 from PyQt4 import QtCore
-import cryptography
 from cryptography.fernet import Fernet
-import os.path
 import base64
+import json
 BUFSIZE = 512 * 1024
-
+SUPPORTED_CIPHER_SUITE = "RSA_FERNET"
 
 class ConnectionManager(QtCore.QThread):
-    def __init__(self, ip, port, gui):
+    def __init__(self, ip, port, gui, user):
+        self.user = user
         self.event = threading.Event()
         self.event.set()
-        self.gui = gui
+        self.running = True
         self.out_buffer = ""
         self.in_buffer = ""
-        if os.path.isfile("teste.txt"):
-            with open("teste.txt", "r") as f:
-                key = f.read()
-                self.fern = Fernet(bytes(key))
-                del key
-        else:
-            key = Fernet.generate_key()
-            with open("teste.txt", 'w') as f:
-                f.write(key)
-            self.fern = Fernet(key)
-            del key
-
-        QtCore.QThread.__init__(self, parent = self.gui)
-
+        self.connect_state = 0
+        QtCore.QThread.__init__(self, parent = gui)
         self.signal = QtCore.SIGNAL("newMsg")
         try:
             self.s = socket.create_connection((ip, port))
@@ -40,7 +29,7 @@ class ConnectionManager(QtCore.QThread):
             self.start()
 
     def run(self):
-        while True:
+        while self.running:
             # we only have one socket to read from
             rlist = [self.s]
             #if we have something to write add the socket to the write list
@@ -49,6 +38,7 @@ class ConnectionManager(QtCore.QThread):
             #must have timeout or it will wait forever until we get a msg from the server
             (rl, wl, xl) = select(rlist, wlist, rlist, 1)
             data = None
+
             if rl:
                 #handle incoming data
                 try:
@@ -58,13 +48,8 @@ class ConnectionManager(QtCore.QThread):
                     pass
                 else:
                     if len(data) > 0:
-                        print data
-                        clear_msg = self.fern.decrypt(bytes(data))
-                        clear_msg = base64.decodestring(clear_msg)
-                        print "clear text"
-                        print clear_msg
-                        self.emit(self.signal, clear_msg)
-
+                        self.handle_requests(data)
+                        self.emit(self.signal, "teste")
             #sync
             if wl and len(self.out_buffer) > 0:
                 try:
@@ -77,13 +62,14 @@ class ConnectionManager(QtCore.QThread):
                 finally:
                     self.event.set()
             #/sync
-
             if xl:
                 pass
                 #error??
 
     def s_connect(self):
-        #TODO: inform server of who we are and prove it
+        msg = self.form_json_connect(1, self.user.name, time.time(), SUPPORTED_CIPHER_SUITE, "")
+        self.send_message(msg)
+        self.connect_state += 1
         return True
 
     def disconnect_from_server(self):
@@ -91,27 +77,45 @@ class ConnectionManager(QtCore.QThread):
 
     def send_message(self, text):
         #to_send = self.fern.encrypt(bytes(base64.encodestring(text)))
-        to_send = self.fern.encrypt(bytes(base64.encodestring(text)))
-
         self.event.wait()
         self.event.clear()
-        self.out_buffer += to_send + "\n\n"
+        self.out_buffer += text + "\n\n"
         self.event.set()
-        """"
-        total_sent = 0
 
-        #TODO: format text to comply with server's protocol
-        #TODO: call User module and cipher text
+    def handle_requests(self, request):
+        try:
+            print "HANDLING message from server: %r", repr(request)
 
-        while total_sent < len(text):
-            sent = self.s.send(text[total_sent:])
-            if sent == 0:
-                raise RuntimeError("socket connection broken")
-            total_sent = total_sent + sent
-        """
+            try:
+                req = json.loads(request)
+            except:
+                return
+
+            if not isinstance(req, dict):
+                return
+
+            if 'type' not in req:
+                return
+
+            if req['type'] == 'ack':
+                return  # TODO: Ignore for now
+
+            self.send_message({'type': 'ack'})
+
+            if req['type'] == 'connect':
+                self.process_connect(req)
+            elif req['type'] == 'secure':
+                self.process_secure(req)
+
+        except Exception, e:
+            print "Could not handle request"
+
+    def process_connect(self, req):
+        if self.connect_state < 1:
+            return
 
 
-    def get_messages(self, user):
+    def process_secure(self, req):
         pass
 
     def get_user_lists(self):
@@ -137,49 +141,24 @@ class ConnectionManager(QtCore.QThread):
         except socket.error:
             return False
 
-
-    def form_json(self, type, src=None, dst=None, data=None, name=None, phase=None, ciphers=None, sa_data=None, id=None,
-                  payload=None):
-        j = None
-        try:
-            if type == "connect":
-                j = json.dumps(
-                    {"type": type, "phase": int(phase), "name": name, "id": id, "ciphers": ciphers, "data": data})
-
-            elif type == "secure":
-                j = json.dumps({"type": type, "sa-data": sa_data, "payload": payload})
-
-            elif type == "list":
-                j = json.dumps({"type": type, "data": data})
-
-            elif type == "client-connect":
-                j = json.dumps({"type": type, "src": src, "dst": dst, "phase": phase, "ciphers": ciphers, "data": data})
-
-            elif type == "client-disconnect" or type == "ack" or type == "client-com":
-                j = json.dumps({"type": type, "src": src, "dst": dst, "data": data})
-        except:
-            raise ConnectionManagerError
-        return j
-
-
     def form_json_connect(self, phase, name, id, ciphers, data):
         if not phase or not name or not id or not ciphers or not data:
             raise json.error
         return json.dumps(
             {"type": "connect", "phase": int(phase), "name": name, "id": id, "ciphers": ciphers, "data": data})
 
-
-    def form_json_secure(self, sa_data, payload):
-        if not  sa_data or not payload:
+    def form_json_secure(self, type, sa_data, payload):
+        if not type or not sa_data or not payload:
             raise json.error
         return json.dumps({"type": "secure", "sa-data": sa_data, "payload": payload})
 
-
-    def form_json_list(self, data):
-        if not data:
+    def form_json_list(self, type, data):
+        if not type or not data:
             raise json.error
         return json.dumps({"type": "list", "data": data})
 
+    def form_json_client_connect(self, type, src, dst, phase, ciphers, data):
+        if not type or not data:
 
     def form_json_client_connect(self, src, dst, phase, ciphers, data):
         if not src or not data or not dst or not phase or not ciphers or not data:
@@ -187,18 +166,23 @@ class ConnectionManager(QtCore.QThread):
         return json.dumps(
             {"type": "client-connect", "src": src, "dst": dst, "phase": phase, "ciphers": ciphers, "data": data})
 
+    def form_json_client_disconnect(self, type, src, dst, data):
 
     def form_json_client_disconnect(self, src, dst, data):
         if not type or not data:
             raise json.error
         return json.dumps({"type": "client-disconnect", "src": src, "dst": dst, "data": data})
 
+    def form_json_ack(self, type, src, dst, data):
+        if not type or not data:
 
     def form_json_ack(self, src, dst, data):
         if not src or not data or not dst:
             raise json.error
         return json.dumps({"type": "ack", "src": src, "dst": dst, "data": data})
 
+    def form_json_client_com(self, type, src, dst, data):
+        if not type or not data:
 
     def form_json_client_com(self, src, dst, data):
         if not src or not data or not dst:
