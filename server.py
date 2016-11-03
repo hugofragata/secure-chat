@@ -8,6 +8,7 @@
 import server_crypt_utils
 from socket import *
 from select import *
+from security import *
 import json
 import sys
 import time
@@ -25,6 +26,8 @@ STATE_NONE = 0
 STATE_CONNECTED = 1
 STATE_DISCONNECTED = 2
 
+SUPPORTED_CIPHER_SUITES = ["RSA_FERNET", ""]
+
 
 class Client:
     count = 0
@@ -39,6 +42,7 @@ class Client:
         self.level = 0
         self.state = STATE_NONE
         self.name = "Unknown"
+        self.cipher_suite = None
 
     def __str__(self):
         """ Converts object into string.
@@ -121,6 +125,7 @@ class Server:
         # clients to manage (indexed by socket and by name):
         self.clients = {}       # clients (key is socket)
         self.id2client = {}   # clients (key is id)
+        self.sec = security()
 
     def stop(self):
         """ Stops the server closing all sockets
@@ -298,21 +303,50 @@ class Server:
             logging.warning("Connect message with missing fields")
             return
 
-        msg = {'type': 'connect', 'phase': request['phase'] + 1, 'ciphers': ['NONE']}
-
-        if len(request['ciphers']) > 1 or 'NONE' not in request['ciphers']:
-            logging.info("Connect continue to phase " + msg['phase'])
-            if request['ciphers'] == "RSA_FERNET":
-                certificate = server_crypt_utils.get_certificate()
-                msg = {'type': 'connect', 'phase': request['phase'] + 1, 'name': "server", 'id': time.time(), 'ciphers': ['RSA_FERNET'], 'data': certificate}
+        if sender.level == 0:
+            # TODO: change choice
+            if request['ciphers'][0] in SUPPORTED_CIPHER_SUITES:
+                sender.cipher_suite = request['ciphers'][0]
+            else:
+                sender.cipher_suite = request['ciphers'][1]
+            msg = {'type': 'connect', 'phase': request['phase'] + 1, 'id': time.time(), 'ciphers': sender.cipher_suite, 'data': ""}
             sender.send(msg)
+            self.id2client[request['id']] = sender
+            sender.id = request['id']
+            sender.name = request['name']
+            sender.level = 1
             return
+        elif sender.level == 1:
+            if "data" not in request.keys():
+                logging.warning("Missing fields")
+                return
+            if request['data'] == 'ok b0ss':
+                # TODO: check cipher suite to use
+                # TODO: check name?
+                priv_key, pub_key = self.sec.rsa_gen_key_pair()
+                sender.sa_data = priv_key
+                priv_key = ""
+                msg = {'type': 'connect', 'phase': request['phase'] + 1, 'id': time.time(),
+                       'ciphers': sender.cipher_suite, 'data': pub_key}
+                sender.send(msg)
+                sender.level = 2
+            elif request['data'] == 'not supported':
+                logging.warning("Connect message with missing fields")
 
-        self.id2client[request['id']] = sender
-        sender.id = request['id']
-        sender.name = request['name']
-        sender.level = 1
-        sender.state = STATE_CONNECTED
+        elif sender.level == 2:
+            if 'data' not in request.keys():
+                logging.warning("Missing fields")
+                return
+            # TODO: check cipher suite to use
+            session_key = self.sec.rsa_decrypt_with_private_key(request['data'], sender.sa_data)
+            sender.sa_data = session_key
+            # TODO: cipher last message and make a sha2 of it and send as confirmation
+            msg = {'type': 'connect', 'phase': request['phase'] + 1, 'id': time.time(),
+                       'ciphers': sender.cipher_suite, 'data': "ok ok"}
+            sender.send(msg)
+            sender.level = 200
+            sender.setState(STATE_CONNECTED)
+
         logging.info("Client %s Connected" % request['id'])
 
     def processList(self, sender, request):

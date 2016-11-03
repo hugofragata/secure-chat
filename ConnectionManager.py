@@ -8,7 +8,7 @@ from security import *
 import base64
 import json
 BUFSIZE = 512 * 1024
-SUPPORTED_CIPHER_SUITES = ["RSA_FERNET"]
+SUPPORTED_CIPHER_SUITES = ["RSA_FERNET", ""]
 
 
 class ConnectionManager(QtCore.QThread):

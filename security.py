@@ -43,10 +43,8 @@ class security:
         return shared_key
 
     def rsa_gen_key_pair(self):
-
         priv_key = rsa.generate_private_key(65537, 4096, default_backend())
         pub_key = priv_key.public_key()
-
         return (priv_key, pub_key)
 
     def rsa_load_key_pair(self, path_to_key):
