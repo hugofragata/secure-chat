@@ -8,18 +8,25 @@ from security import *
 import base64
 import json
 BUFSIZE = 512 * 1024
-SUPPORTED_CIPHER_SUITE = "RSA_FERNET"
+SUPPORTED_CIPHER_SUITES = ["RSA_FERNET"]
+
 
 class ConnectionManager(QtCore.QThread):
     def __init__(self, ip, port, gui, user):
         self.user = user
+        self.cipher_suite = ""
+        self.sym_key = None
+        self.connect_check = None
+        self.connecting_event = threading.Event()
         self.event = threading.Event()
         self.event.set()
         self.running = True
+        self.sec = security()
         self.out_buffer = ""
         self.in_buffer = ""
-        self.connect_state = 0
-        QtCore.QThread.__init__(self, parent = gui)
+        # TODO: change connect_state to a enum? CONNECTED, etc
+        self.connect_state = 1
+        QtCore.QThread.__init__(self, parent=gui)
         self.signal = QtCore.SIGNAL("newMsg")
         try:
             self.s = socket.create_connection((ip, port))
@@ -32,25 +39,25 @@ class ConnectionManager(QtCore.QThread):
         while self.running:
             # we only have one socket to read from
             rlist = [self.s]
-            #if we have something to write add the socket to the write list
-            #ugly but works :^) // :3 // :~]
+            # if we have something to write add the socket to the write list
+            # ugly but works :^) // :3 // :~]
             wlist = [s for s in rlist if len(self.out_buffer)>0]
-            #must have timeout or it will wait forever until we get a msg from the server
+            # must have timeout or it will wait forever until we get a msg from the server
             (rl, wl, xl) = select(rlist, wlist, rlist, 1)
             data = None
 
             if rl:
-                #handle incoming data
+                # handle incoming data
                 try:
                     data = self.s.recv(BUFSIZE)
                 except:
-                    #error
+                    # error
                     pass
                 else:
                     if len(data) > 0:
                         self.handle_requests(data)
                         self.emit(self.signal, "teste")
-            #sync
+            # sync
             if wl and len(self.out_buffer) > 0:
                 try:
                     self.event.wait()
@@ -61,22 +68,26 @@ class ConnectionManager(QtCore.QThread):
                     pass
                 finally:
                     self.event.set()
-            #/sync
+            # /sync
             if xl:
                 pass
-                #error??
+                # error??
 
     def s_connect(self):
-        msg = self.form_json_connect(1, self.user.name, time.time(), SUPPORTED_CIPHER_SUITE, "")
+        msg = self.form_json_connect(1, self.user.name, time.time(), SUPPORTED_CIPHER_SUITES, "")
         self.send_message(msg)
         self.connect_state += 1
+        self.connecting_event.clear()
+        self.connecting_event.wait(timeout=30)
+        if self.connect_state != 200:
+            return False
         return True
 
     def disconnect_from_server(self):
         pass
 
     def send_message(self, text):
-        #to_send = self.fern.encrypt(bytes(base64.encodestring(text)))
+        # to_send = self.fern.encrypt(bytes(base64.encodestring(text)))
         self.event.wait()
         self.event.clear()
         self.out_buffer += text + "\n\n"
@@ -100,7 +111,8 @@ class ConnectionManager(QtCore.QThread):
             if req['type'] == 'ack':
                 return  # TODO: Ignore for now
 
-            self.send_message({'type': 'ack'})
+            ack = {'type': 'ack', 'id': req['id']}
+            self.send_message(json.dumps(ack))
 
             if req['type'] == 'connect':
                 self.process_connect(req)
@@ -111,22 +123,56 @@ class ConnectionManager(QtCore.QThread):
             print "Could not handle request"
 
     def process_connect(self, req):
-        if self.connect_state < 1:
-            return
-        if req['ciphers'] != SUPPORTED_CIPHER_SUITE:
-            raise ConnectionManagerError
-        if len(req['data']) < 1:
-            return
-        if self.connect_state == 1:
-            server_pubkey = req['data']
-            sym_key = security.generate_key_symmetric()
-            #security.
+        if req['phase'] == 2:
+            if self.connect_state != 2:
+                return
+            if req['ciphers'] not in SUPPORTED_CIPHER_SUITES:
+                msg = {'type': 'connect', 'phase': req['phase'] + 1, 'name': self.user.name, 'id': time.time(),
+                       'ciphers': req['ciphers'], 'data': 'not supported'}
+                self.send_message(json.dumps(msg))
+                raise ConnectionManagerError
+            # TODO: check certificate of server
+            self.cipher_suite = req['ciphers']
+            msg = {'type': 'connect', 'phase': req['phase'] + 1, 'name': self.user.name, 'id': time.time(),
+                   'ciphers': self.cipher_suite, 'data': 'ok b0ss'}
+            self.send_message(json.dumps(msg))
+            self.connect_state += 1
 
+        if req['phase'] == 4:
+            if self.connect_state != 3:
+                return
+            if self.cipher_suite == SUPPORTED_CIPHER_SUITES[0]:
+                if len(req['data']) == 0:
+                    return
+                server_pubkey = req['data']
+                sym_key = self.sec.generate_key_symmetric()
+                self.sym_key = sym_key
+                to_send = base64.encodestring(self.sec.rsa_encrypt_with_public_key(sym_key, server_pubkey))
+                msg = {'type': 'connect', 'phase': req['phase'] + 1, 'name': self.user.name, 'id': time.time(),
+                       'ciphers': self.cipher_suite, 'data': to_send}
+                self.send_message(json.dumps(msg))
+                self.connect_state += 1
+                self.connect_check = self.sec.get_hash(json.dumps(msg))
 
+            elif self.cipher_suite == SUPPORTED_CIPHER_SUITES[1]:
+                # TODO: DH
+                pass
 
-
-
-
+        if req['phase'] == 6:
+            if self.connect_state != 4:
+                return
+            if len(req['data']) == 0:
+                return
+            if self.cipher_suite == SUPPORTED_CIPHER_SUITES[0]:
+                check = self.sec.decrypt_with_symmetric(req['data'], self.sym_key)
+                if check != self.connect_check:
+                    raise ConnectionManagerError
+                self.connect_state = 200
+                self.connecting_event.set()
+                # Connected!
+            elif self.cipher_suite == SUPPORTED_CIPHER_SUITES[1]:
+                # TODO: DH
+                pass
 
     def process_secure(self, req):
         pass

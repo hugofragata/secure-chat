@@ -158,5 +158,16 @@ class security:
 
         return Fernet(key)
 
+
+################
+# digest functions
+################
+    def get_hash(self, text):
+        digest = hashes.Hash(hashes.SHA256(), backend=default_backend())
+        digest.update(text)
+        return digest.finalize()
+
+
+
 class security_error:
     pass
