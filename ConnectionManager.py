@@ -110,23 +110,20 @@ class ConnectionManager(QtCore.QThread):
 
                 if not isinstance(r, dict):
                     return
-
                 if 'type' not in r:
                     continue
-
                 if r['type'] == 'ack':
                     continue  # TODO: Ignore for now
                 if 'id' in r.keys():
                     ack = {'type': 'ack', 'id': r['id']}
                     self.send_message(json.dumps(ack))
-
                 if r['type'] == 'connect':
                     self.process_connect(r)
                 elif r['type'] == 'secure':
                     self.process_secure(r)
 
             except Exception, e:
-                raise e
+                print e
                 print "Could not handle request"
 
     def process_connect(self, req):
@@ -158,11 +155,9 @@ class ConnectionManager(QtCore.QThread):
                 to_send = base64.encodestring(to_send)
                 msg = {'type': 'connect', 'phase': req['phase'] + 1, 'name': self.user.name, 'id': time.time(),
                        'ciphers': self.cipher_suite, 'data': to_send}
-                temp = json.dumps(msg)
-                self.send_message(temp)
+                self.send_message(json.dumps(msg))
                 self.connect_state += 1
-                self.connect_check = self.sec.get_hash(bytes(str(temp['id']) + temp['data']))
-
+                self.connect_check = self.sec.get_hash(bytes(str(msg['id']) + msg['data']))
             elif self.cipher_suite == SUPPORTED_CIPHER_SUITES[1]:
                 # TODO: DH
                 pass
@@ -175,6 +170,7 @@ class ConnectionManager(QtCore.QThread):
             if self.cipher_suite == SUPPORTED_CIPHER_SUITES[0]:
                 check = self.sec.decrypt_with_symmetric(base64.decodestring(req['data']), self.sym_key)
                 if check != self.connect_check:
+                    print "erro1"
                     raise ConnectionManagerError
                 self.connect_state = 200
                 self.connecting_event.set()

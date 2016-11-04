@@ -161,7 +161,7 @@ class security:
 
     def decrypt_with_symmetric(self, text, key):
         f = Fernet(key)
-        return f.decrypt(bytes(base64.decodestring(text)))
+        return base64.decodestring(f.decrypt(text))
 
     def derive_symmetric_key(self, original_key):
         salt = os.urandom(16)
