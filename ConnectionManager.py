@@ -201,7 +201,10 @@ class ConnectionManager(QtCore.QThread):
             self.proces_client_ack(plj)
 
     def get_user_lists(self):
-        pass
+        get_list = {'type': 'list', 'data': 'passa ai os users sff'}
+        get_list = self.sec.encrypt_with_symmetric(json.dumps(get_list), self.sym_key)
+        msg = {'type': 'secure', 'sa-data': 'aa', 'data': get_list}
+        self.send_message(json.dumps(msg))
 
     @staticmethod
     def is_ip_address(ip):
