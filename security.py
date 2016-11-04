@@ -119,7 +119,7 @@ class security:
                 mgf = padding.MGF1(hashes.SHA256()),
                 salt_length = padding.PSS.MAX_LENGTH),
             hashes.SHA256())
-        verifier.update(message)
+        verifier.update(signature)
         try:
             verifier.verify()
         except:
@@ -130,16 +130,16 @@ class security:
     def rsa_encrypt_with_public_key(self, text, public_key):
         cipher_text = public_key.encrypt(text,
                                         padding.OAEP(
-                                            mgf = padding.MGF1(algorithm=hashes.SHA1()),
-                                            algorithm = hashes.SHA1,
+                                            mgf = padding.MGF1(algorithm=hashes.SHA256()),
+                                            algorithm = hashes.SHA256,
                                             label = None))
         return cipher_text
 
     def rsa_decrypt_with_private_key(self, text, private_key):
         plain_text = private_key.decrypt(text,
                                         padding.OAEP(
-                                            mgf=padding.MGF1(algorithm=hashes.SHA1()),
-                                            algorithm=hashes.SHA1,
+                                            mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                                            algorithm=hashes.SHA256,
                                             label=None))
         return plain_text
 
