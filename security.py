@@ -128,10 +128,13 @@ class security:
             return True
 
     def rsa_encrypt_with_public_key(self, text, public_key):
+        if not isinstance(public_key, rsa.RSAPublicKey):
+            raise security_error
+
         cipher_text = public_key.encrypt(text,
                                         padding.OAEP(
                                             mgf = padding.MGF1(algorithm=hashes.SHA256()),
-                                            algorithm = hashes.SHA256,
+                                            algorithm = hashes.SHA256(),
                                             label = None))
         return cipher_text
 
@@ -139,7 +142,7 @@ class security:
         plain_text = private_key.decrypt(text,
                                         padding.OAEP(
                                             mgf=padding.MGF1(algorithm=hashes.SHA256()),
-                                            algorithm=hashes.SHA256,
+                                            algorithm=hashes.SHA256(),
                                             label=None))
         return plain_text
 
