@@ -26,7 +26,7 @@ STATE_NONE = 0
 STATE_CONNECTED = 1
 STATE_DISCONNECTED = 2
 
-SUPPORTED_CIPHER_SUITES = ["RSA_FERNET", ""]
+SUPPORTED_CIPHER_SUITES = ["RSA_WITH_AES_128_CBC_SHA256", "ECDHE_WITH_AES_128_CBC_SHA256", "NONE"]
 
 
 class Client:
@@ -71,7 +71,7 @@ class Client:
 
         self.bufin += data
         reqs = self.bufin.split(TERMINATOR)
-        print reqs
+        #print reqs
         self.bufin = reqs[-1]
         return reqs[:-1]
 
@@ -304,6 +304,7 @@ class Server:
             return
 
         if sender.level == 0:
+            print "LEVEL 0 \n\n"
             # TODO: change choice
             if request['ciphers'][0] in SUPPORTED_CIPHER_SUITES:
                 sender.cipher_suite = request['ciphers'][0]
@@ -317,6 +318,7 @@ class Server:
             sender.level = 1
             return
         elif sender.level == 1:
+            print "LEVEL 1 \n\n"
             if "data" not in request.keys():
                 logging.warning("Missing fields")
                 return
@@ -327,22 +329,28 @@ class Server:
                 sender.sa_data = priv_key
                 priv_key = ""
                 msg = {'type': 'connect', 'phase': request['phase'] + 1, 'id': time.time(),
-                       'ciphers': sender.cipher_suite, 'data': pub_key}
+                       'ciphers': sender.cipher_suite, 'data': base64.encodestring(self.sec.rsa_public_key_to_pem(pub_key))}
                 sender.send(msg)
                 sender.level = 2
             elif request['data'] == 'not supported':
                 logging.warning("Connect message with missing fields")
 
         elif sender.level == 2:
+            print "LEVEL 2 \n\n"
             if 'data' not in request.keys():
                 logging.warning("Missing fields")
                 return
             # TODO: check cipher suite to use
-            session_key = self.sec.rsa_decrypt_with_private_key(request['data'], sender.sa_data)
+            print request['data']
+            print type(sender.sa_data)
+            session_key = self.sec.rsa_decrypt_with_private_key(base64.decodestring(request['data']), sender.sa_data)
             sender.sa_data = session_key
+            session_key = ""
             # TODO: cipher last message and make a sha2 of it and send as confirmation
+            to_send = self.sec.encrypt_with_symmetric(self.sec.get_hash(bytes(str(request['id']) + request['data'])), sender.sa_data)
+            to_send = base64.encodestring(to_send)
             msg = {'type': 'connect', 'phase': request['phase'] + 1, 'id': time.time(),
-                       'ciphers': sender.cipher_suite, 'data': "ok ok"}
+                       'ciphers': sender.cipher_suite, 'data': to_send}
             sender.send(msg)
             sender.level = 200
             sender.setState(STATE_CONNECTED)

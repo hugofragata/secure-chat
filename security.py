@@ -157,7 +157,7 @@ class security:
 
     def encrypt_with_symmetric(self, text, key):
         f = Fernet(key)
-        return  f.encrypt(bytes(base64.encodestring(text)))
+        return f.encrypt(bytes(base64.encodestring(text)))
 
     def decrypt_with_symmetric(self, text, key):
         f = Fernet(key)
