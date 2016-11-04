@@ -14,10 +14,11 @@ from hashlib import sha256
 import base64
 
 path_to_key = "./key.pem"
+SUPPORTED_CIPHER_SUITES = ["RSA_WITH_AES_128_CBC_SHA256", "ECDHE_WITH_AES_128_CBC_SHA256", "NONE"]
 
-CIPHER_SUITE_A = "RSA_WITH_AES_128_CBC_SHA256"
-CIPHER_SUITE_B = "ECDHE_WITH_AES_128_CBC_SHA256"
 
+#TODO 1 shouldn't be a class, should be a set of fucntions only
+#TODO 2 when security module is called remove the instance
 class security:
 
     def __init__(self):
@@ -37,10 +38,36 @@ class security:
 
         return (private_key, peer_public_key)
 
-    def ecdh_get_shared_secret(self, partner_public_key):
+    def ecdh_get_shared_secret(self, private_key, partner_public_key):
+
         shared_key = private_key.exchange(ec.ECDH(), partner_public_key)
 
         return shared_key
+
+    def rsa_private_pem_to_key(self, pem):
+
+        private_key = serialization.load_pem_private_key(
+            pem,
+            password=None,
+            backend=default_backend())
+
+        return  private_key
+
+    def rsa_public_pem_to_key(self, pem):
+
+        public_key = serialization.load_pem_public_key(
+            pem,
+            backend=default_backend())
+
+        return public_key
+
+    def rsa_public_key_to_pem(self, public_key):
+
+        pem = public_key.public_bytes(
+            encoding = serialization.Encoding.PEM,
+            format = serialization.PublicFormat.SubjectPublicKeyInfo)
+
+        return pem
 
     def rsa_gen_key_pair(self):
         priv_key = rsa.generate_private_key(65537, 4096, default_backend())
@@ -158,11 +185,14 @@ class security:
 
 
 ################
-# digest functions
+# Misc functions
 ################
+
     def get_hash(self, text):
+
         digest = hashes.Hash(hashes.SHA256(), backend=default_backend())
         digest.update(text)
+
         return digest.finalize()
 
 
