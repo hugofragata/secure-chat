@@ -365,7 +365,12 @@ class Server:
             logging.warning("LIST from disconnected client: %s" % sender)
             return
 
-        sender.send({'type': 'secure', 'payload': {'type': 'list', 'data': self.clientList()}})
+        if sender.level != 200:
+            return
+
+        pl =  json.dumps({'type': 'list', 'data': self.clientList()})
+        plc = base64.encodestring(self.sec.encrypt_with_symmetric(pl, sender.sa_data))
+        sender.send({'type': 'secure', 'payload': plc})
 
     def processSecure(self, sender, request):
         """

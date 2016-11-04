@@ -180,21 +180,27 @@ class ConnectionManager(QtCore.QThread):
                 pass
 
     def process_secure(self, req):
-        pass
+        if not req['type'] == 'secure':
+            return
+        if self.connect_state == 200:
+            return
+
+        plc = base64.decodestring(req['payload'])
+        pl = self.sec.decrypt_with_symmetric(plc, self.sym_key)
+        plj = json.loads(pl)
+
+        if plj['type'] == 'list':
+            self.process_list(plj)
+        elif plj['type'] == 'client-connect':
+            self.proces_client_connect(plj)
+        elif plj['type'] == 'client-disconnect':
+            self.proces_client_disconnect(plj)
+        elif plj['type'] == 'client-com':
+            self.proces_client_com(plj)
+        elif plj['type'] == 'ack':
+            self.proces_client_ack(plj)
 
     def get_user_lists(self):
-        pass
-
-    def verify_ack_received(self, msg_id):
-        pass
-
-    def verify_ack_read(self, msg_id):
-        pass
-
-    def send_ack_msg_received(self, msg_id):
-        pass
-
-    def send_ack_msg_read(self, msg_id):
         pass
 
     @staticmethod
