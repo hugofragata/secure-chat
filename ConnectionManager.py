@@ -219,11 +219,11 @@ class ConnectionManager(QtCore.QThread):
 
         dst_sym_key = self.peers[self.peer_connected].sa_data
         dst_id = self.peers[self.peer_connected].id
-        ciphered_data = base64.encodestring(self.sec.encrypt_with_symmetric(text, dst_sym_key))
+        ciphered_data_to_client = base64.encodestring(self.sec.encrypt_with_symmetric(text, dst_sym_key))
 
-        msg = json.dumps({'type': 'client-com', 'src': self.user.id, 'dst': dst_id, 'data': ciphered_data})
-        msg_secure = self.sec.encrypt_with_symmetric( msg, self.sym_key)
-        msg_secure_ciphered = json.dumps({'type': 'secure', 'sa-data': 'not used', 'payload': msg_secure})
+        msg_to_client = json.dumps({'type': 'client-com', 'src': self.user.id, 'dst': dst_id, 'data': ciphered_data_to_client})
+        payload_to_server = self.sec.encrypt_with_symmetric(msg_to_client, self.sym_key)
+        msg_secure_ciphered = json.dumps({'type': 'secure', 'sa-data': 'not used', 'payload': payload_to_server})
         self.send_message(msg_secure_ciphered)
 
 
