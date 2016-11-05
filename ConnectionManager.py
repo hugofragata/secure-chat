@@ -292,8 +292,11 @@ class ConnectionManager(QtCore.QThread):
             return
         if not self.user.connection_state == 200:
             return
+        if not self.peer_connected == cdj['src']:
+            return
 
-        self.client_connect_state[cdj['src']] = None
+        del self.peers[self.peer_connected]
+        self.peer_connected = None
         return
 
     def get_user_lists(self):
@@ -301,6 +304,7 @@ class ConnectionManager(QtCore.QThread):
         get_list = self.sec.encrypt_with_symmetric(json.dumps(get_list), self.sym_key)
         msg = {'type': 'secure', 'sa-data': 'aa', 'payload': get_list}
         self.send_message(json.dumps(msg))
+        return
 
     def process_list(self, data):
         if 'data' not in data.keys():
