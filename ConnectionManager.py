@@ -215,6 +215,22 @@ class ConnectionManager(QtCore.QThread):
         msg_secure_ciphered = json.dumps({'type': 'secure', 'sa-data': 'not used', 'payload': payload_to_server})
         self.send_message(msg_secure_ciphered)
 
+    def process_client_com(self, payload_j):
+        peer_id = self.peers[self.peer_connected].id
+        if not payload_j['src'] == peer_id:
+            return
+        if not self.user.connection_state == 200:
+            return
+
+        ciphered_data = payload_j['data']
+        peer_sym_key = self.peers[self.peer_connected].sa_data
+
+        deciphered_data = base64.decodestring(self.sec.decrypt_with_symmetric(ciphered_data, peer_sym_key))
+
+        self.emit(self.signal, deciphered_data)
+
+        return
+
     def process_client_ack(self, ack_json_from_peer):
         pass
 
