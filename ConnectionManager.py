@@ -206,9 +206,22 @@ class ConnectionManager(QtCore.QThread):
             self.process_client_disconnect(plj)
         elif plj['type'] == 'client-com':
             self.process_client_com(plj)
+            self.send_ack_peer(plj['data'])
         elif plj['type'] == 'ack':
             self.process_client_ack(plj)
 
+    def send_ack_peer(self, comm_data):
+        hashed_data = self.sec.get_hash(comm_data)
+        dst_id = self.peers[self.peer_connected].id
+        msg_to_peer = json.dumps({'type': 'ack', 'src': self.user.id, 'dst': dst_id, 'data': hashed_data})
+
+        payload_to_server = self.sec.encrypt_with_symmetric(msg_to_peer, self.sym_key)
+        msg_secure_ciphered = json.dumps({'type': 'secure', 'sa-data': 'not used', 'payload': payload_to_server})
+        self.send_message(msg_secure_ciphered)
+
+
+    def process_client_ack(self, ack_json_from_peer):
+        pass
 
     def send_client_comm(self, text):
         if not self.user.connection_state == 200:
