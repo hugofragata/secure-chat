@@ -227,9 +227,10 @@ class ConnectionManager(QtCore.QThread):
         ciphered_data = payload_j['data']
         peer_sym_key = self.peers[self.peer_connected].sa_data
 
-        unciphered_data = self.sec.decrypt_with_symmetric(ciphered_data, peer_sym_key)
+        unciphered_data = base64.decodestring(self.sec.decrypt_with_symmetric(ciphered_data, peer_sym_key))
 
-        #TODO show unciphered_data on gui
+        self.emit(self.signal, unciphered_data)
+
         return
 
     def process_client_ack(self, ack_json_from_peer):
