@@ -8,6 +8,3 @@ class User:
         self.sa_data = None
         self.connection_state = 1
 
-    def send(self, text):
-        pass
-

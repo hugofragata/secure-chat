@@ -278,6 +278,8 @@ class Server:
                 self.processConnect(client, req)
             elif req['type'] == 'secure':
                 self.processSecure(client, req)
+            elif req['type'] == 'disconnect':
+                self.delClient(client.socket)
 
         except Exception, e:
             logging.exception("Could not handle request")
