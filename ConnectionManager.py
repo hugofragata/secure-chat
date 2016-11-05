@@ -207,8 +207,8 @@ class ConnectionManager(QtCore.QThread):
             self.process_client_ack(plj)
 
     def send_ack_peer(self, comm_data):
-        hashed_data = self.sec.get_hash(comm_data)
-        dst_id = self.peers[self.peer_connected].id
+        hashed_data = self.sec.get_hash(str(comm_data))
+        dst_id = self.peer_connected
         msg_to_peer = json.dumps({'type': 'ack', 'src': self.user.id, 'dst': dst_id, 'data': hashed_data})
 
         payload_to_server = self.sec.encrypt_with_symmetric(msg_to_peer, self.sym_key)
