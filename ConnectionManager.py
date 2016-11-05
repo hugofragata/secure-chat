@@ -223,13 +223,15 @@ class ConnectionManager(QtCore.QThread):
         peer_id = self.peers[self.peer_connected].id
         if not payload_j['src'] == peer_id:
             return
+        if not self.user.connection_state == 200:
+            return
 
         ciphered_data = payload_j['data']
         peer_sym_key = self.peers[self.peer_connected].sa_data
 
-        unciphered_data = base64.decodestring(self.sec.decrypt_with_symmetric(ciphered_data, peer_sym_key))
+        deciphered_data = base64.decodestring(self.sec.decrypt_with_symmetric(ciphered_data, peer_sym_key))
 
-        self.emit(self.signal, unciphered_data)
+        self.emit(self.signal, deciphered_data)
 
         return
 
