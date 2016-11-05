@@ -281,6 +281,7 @@ class Server:
             elif req['type'] == 'disconnect':
                 self.delClient(client.socket)
 
+
         except Exception, e:
             logging.exception("Could not handle request")
 

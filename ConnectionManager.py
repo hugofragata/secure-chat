@@ -97,6 +97,7 @@ class ConnectionManager(QtCore.QThread):
 
 
 
+
     def send_message(self, text):
         # to_send = self.fern.encrypt(bytes(base64.encodestring(text)))
         self.event.wait()
