@@ -27,6 +27,7 @@ class ConnectionManager(QtCore.QThread):
         self.in_buffer = ""
         # TODO: change connect_state to a enum? CONNECTED, etc
         self.connect_state = 1
+        self.client_connect_state = {}
         QtCore.QThread.__init__(self, parent=gui)
         self.signal = QtCore.SIGNAL("newMsg")
         self.list_signal = QtCore.SIGNAL("userList")
@@ -183,7 +184,7 @@ class ConnectionManager(QtCore.QThread):
     def process_secure(self, req):
         if not req['type'] == 'secure':
             return
-        if self.connect_state == 200:
+        if not self.connect_state == 200:
             return
 
         plc = base64.decodestring(req['payload'])
@@ -200,6 +201,26 @@ class ConnectionManager(QtCore.QThread):
             self.process_client_com(plj)
         elif plj['type'] == 'ack':
             self.process_client_ack(plj)
+
+    def process_client_connect(self, ccj):
+        if not ccj['type'] == 'client-connect':
+            return
+        if not self.connect_state == 200:
+            return
+
+        if ccj['phase'] == 4:
+            if not self.client_connect_state[ccj['dst']] == 4:
+                return
+
+        elif ccj['phase'] == 6:
+            if not self.client_connect_state[ccj['dst']] == 4:
+                return
+
+    def start_client_connect(self, dst):
+        #TODO everything
+        self.client_connect_state[dst] = 1
+        pass
+
 
     def get_user_lists(self):
         get_list = {'type': 'list', 'data': 'passa ai os users sff'}
