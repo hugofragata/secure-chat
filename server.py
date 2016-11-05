@@ -344,8 +344,6 @@ class Server:
                 logging.warning("Missing fields")
                 return
             # TODO: check cipher suite to use
-            print request['data']
-            print type(sender.sa_data)
             session_key = self.sec.rsa_decrypt_with_private_key(base64.decodestring(request['data']), sender.sa_data)
             sender.sa_data = session_key
             session_key = ""
@@ -409,8 +407,6 @@ class Server:
             return
 
         dst = self.id2client[plj['dst']]
-
-
         pl_to_peer = json.dumps(plj)
         ciphered_pl_to_peer = base64.encodestring(self.sec.encrypt_with_symmetric(pl_to_peer, dst.sa_data))
 

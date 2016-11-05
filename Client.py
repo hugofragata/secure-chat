@@ -77,8 +77,9 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
             self.listWidget.addItem(item)
 
     def connect_to_user(self, item):
-        print item.text()
-        print item.user_id
+        self.msgBox.clear()
+        self.msgBox.setPlainText("Connecting to " + item.user_name)
+        self.comm.start_client_connect(item.user_id)
 
     def updateChat(self, text):
         self.textBrowser.append("<span>" + QtCore.QString.fromLatin1(text, len(text)) + "</span>")
