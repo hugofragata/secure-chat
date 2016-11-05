@@ -356,7 +356,7 @@ class Server:
             sender.level = 200
             sender.setState(STATE_CONNECTED)
 
-        self.broadcast_new_list()
+        self.broadcast_new_list(sender)
         logging.info("Client %s Connected" % request['id'])
 
     def processList(self, sender, request):
@@ -374,12 +374,10 @@ class Server:
         plc = base64.encodestring(self.sec.encrypt_with_symmetric(pl, sender.sa_data))
         sender.send({'type': 'secure', 'payload': plc})
 
-    def broadcast_new_list(self):
-        pl = json.dumps({'type': 'list', 'data': self.clientList()})
-
-        for client in clients:
-            self.processList(clients[client])
-
+    def broadcast_new_list(self, init):
+        for client in self.clients:
+            if self.clients[client] != init:
+                self.processList(self.clients[client], None)
 
     def processSecure(self, sender, request):
         """

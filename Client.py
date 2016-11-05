@@ -67,12 +67,15 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
         text = self.msgBox.toPlainText()
         if not text or text == "\n":
             return
-        self.textBrowser.append(text)
+        self.textBrowser.append(self.comm.user.name + "(eu)> " + text)
         self.comm.send_client_comm(text)
         self.msgBox.clear()
 
     def list_users(self, user_list):
+        self.listWidget.clear()
         for user in user_list:
+            if user['id'] == self.comm.user.id:
+                continue
             item = UserListItem(user['name'], user['id'])
             self.listWidget.addItem(item)
 
@@ -80,11 +83,11 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
         self.textBrowser.clear()
         self.textBrowser.setPlainText("Connecting to " + item.user_name)
         self.comm.start_client_connect(item.user_id)
+        self.textBrowser.setPlainText("Connected")
+        self.setWindowTitle("I am " + self.comm.user.name + ", talking to " + item.user_name)
 
     def updateChat(self, text):
-        self.textBrowser.append("<span>" + QtCore.QString.fromLatin1(text, len(text)) + "</span>")
-        #TODO: append das verificacoes
-        pass
+        self.textBrowser.append("<span>" + self.comm.peers[self.comm.peer_connected].name + "> " + QtCore.QString.fromLatin1(text, len(text)) + "</span>")
 
     def eventFilter(self, obj, event):
         if event.type() == QtCore.QEvent.KeyPress and obj == self.msgBox:

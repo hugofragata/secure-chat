@@ -207,7 +207,8 @@ class ConnectionManager(QtCore.QThread):
             self.process_client_ack(plj)
 
     def send_ack_peer(self, comm_data):
-        hashed_data = self.sec.get_hash(str(comm_data))
+        hashed_data = base64.encodestring(self.sec.get_hash(base64.decodestring(comm_data)))
+        print "aqui"
         dst_id = self.peer_connected
         msg_to_peer = json.dumps({'type': 'ack', 'src': self.user.id, 'dst': dst_id, 'data': hashed_data})
 
@@ -240,7 +241,7 @@ class ConnectionManager(QtCore.QThread):
         print "enviou"
         dst_sym_key = self.peers[self.peer_connected].sa_data
         dst_id = self.peer_connected
-        ciphered_data_to_client = base64.encodestring(self.sec.encrypt_with_symmetric(str(text), dst_sym_key))
+        ciphered_data_to_client = base64.encodestring(self.sec.encrypt_with_symmetric(text, dst_sym_key))
         msg_to_client = json.dumps({'type': 'client-com', 'src': self.user.id, 'dst': dst_id, 'data': ciphered_data_to_client})
         payload_to_server = self.sec.encrypt_with_symmetric(msg_to_client, self.sym_key)
         payload_to_server = base64.encodestring(payload_to_server)
@@ -248,8 +249,6 @@ class ConnectionManager(QtCore.QThread):
         self.send_message(msg_secure_ciphered)
 
     def process_client_connect(self, ccj):
-        print ccj
-        print "\n\n"
         if self.user.connection_state != 200:
             return
         if not all(k in ccj.keys() for k in ("src", "dst", "phase", "id", "ciphers")):
@@ -261,8 +260,6 @@ class ConnectionManager(QtCore.QThread):
             elif self.peers[ccj['src']].connection_state != 1:
                 return
             # TODO: choose suite
-            print ccj['ciphers'][0]
-            print "\n\n"
             msg = json.dumps({"type": "client-connect", 'id': time.time(), "src": self.user.id, "dst": ccj['src'], "phase": 2, "ciphers": ccj['ciphers'][0],
                               "data": self.user.name})
             ciphered_pl = base64.encodestring(self.sec.encrypt_with_symmetric(msg, self.sym_key))
@@ -364,7 +361,7 @@ class ConnectionManager(QtCore.QThread):
                 ciphered_pl = base64.encodestring(self.sec.encrypt_with_symmetric(msg, self.sym_key))
                 secure_msg = {'type': 'secure', 'sa-data': 'aa', 'payload': ciphered_pl}
                 self.send_message(json.dumps(secure_msg))
-                self.peers[ccj['src']].connection_state = 4
+                self.peers[ccj['src']].connection_state = 200
                 self.peer_connected = ccj['src']
                 print "connected to peer \n\n\n\n"
             elif self.peers[ccj['src']].cipher_suite == SUPPORTED_CIPHER_SUITES[1]:
@@ -434,7 +431,8 @@ class ConnectionManager(QtCore.QThread):
         if 'data' not in data.keys():
             return
         for u in data['data']:
-            self.peers[u['id']] = User(u['name'], uid=u['id'])
+            if u['id'] not in self.peers.keys():
+                self.peers[u['id']] = User(u['name'], uid=u['id'])
         self.emit(self.list_signal, data['data'])
 
     @staticmethod
