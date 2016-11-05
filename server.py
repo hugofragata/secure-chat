@@ -386,8 +386,8 @@ class Server:
 
         # This is a secure message.
         # TODO: Inner message is encrypted for us. Must decrypt and validate.
-        plc = base64.decodestring(req['payload'])
-        pl = self.sec.decrypt_with_symmetric(plc, self.sym_key)
+        print request['payload']
+        pl = self.sec.decrypt_with_symmetric(bytes(request['payload']), sender.sa_data)
         plj = json.loads(pl)
 
         if not 'type' in plj.keys():

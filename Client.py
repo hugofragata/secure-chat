@@ -25,6 +25,7 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
         accept = self.login_dialog.exec_()
         if accept == 0:
             quit()
+        self.comm.get_user_lists()
 
     def login(self):
         QtGui.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
@@ -71,7 +72,6 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
     def list_users(self, user_list):
         for user in user_list:
             self.listWidget.addItem(user['name'])
-
 
     def updateChat(self, text):
         self.textBrowser.append("<span>" + QtCore.QString.fromLatin1(text, len(text)) + "</span>")

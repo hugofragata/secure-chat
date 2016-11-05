@@ -183,13 +183,9 @@ class ConnectionManager(QtCore.QThread):
                 pass
 
     def process_secure(self, req):
-        if not req['type'] == 'secure':
+        if self.connect_state != 200:
             return
-        if not self.connect_state == 200:
-            return
-
-        plc = base64.decodestring(req['payload'])
-        pl = self.sec.decrypt_with_symmetric(plc, self.sym_key)
+        pl = self.sec.decrypt_with_symmetric(base64.decodestring(req['payload']), self.sym_key)
         plj = json.loads(pl)
 
         if plj['type'] == 'list':
@@ -265,7 +261,7 @@ class ConnectionManager(QtCore.QThread):
     def get_user_lists(self):
         get_list = {'type': 'list', 'data': 'passa ai os users sff'}
         get_list = self.sec.encrypt_with_symmetric(json.dumps(get_list), self.sym_key)
-        msg = {'type': 'secure', 'sa-data': 'aa', 'data': get_list}
+        msg = {'type': 'secure', 'sa-data': 'aa', 'payload': get_list}
         self.send_message(json.dumps(msg))
 
     def process_list(self, data):
