@@ -414,7 +414,7 @@ class Server:
         pl_to_peer = json.dumps(plj)
         ciphered_pl_to_peer = base64.encodestring(self.sec.encrypt_with_symmetric(pl_to_peer, dst.sa_data))
 
-        dst_message = {'type': 'secure', 'payload': ciphered_pl_to_peer}
+        dst_message = {'type': 'secure', 'sa-data': 'not used', 'payload': ciphered_pl_to_peer}
         dst.send(dst_message)
 
 
