@@ -29,6 +29,7 @@ class ConnectionManager(QtCore.QThread):
         # TODO: change connect_state to a enum? CONNECTED, etc
         # Dic with id:User
         self.peers = {}
+        self.peer_connected = None #id of connect peer client
         QtCore.QThread.__init__(self, parent=gui)
         self.signal = QtCore.SIGNAL("newMsg")
         self.list_signal = QtCore.SIGNAL("userList")
@@ -162,7 +163,7 @@ class ConnectionManager(QtCore.QThread):
                     return
                 server_pubkey = self.sec.rsa_public_pem_to_key(base64.decodestring(req['data']))
                 sym_key = self.sec.generate_key_symmetric()
-                self.sym_key = sym_key
+                self.sym_key = sym_key #b-b-but that's lewd, s-senpai :3
                 to_send = self.sec.rsa_encrypt_with_public_key(sym_key, server_pubkey)
                 to_send = base64.encodestring(to_send)
                 msg = {'type': 'connect', 'phase': req['phase'] + 1, 'name': self.user.name, 'id': time.time(),
@@ -208,6 +209,25 @@ class ConnectionManager(QtCore.QThread):
         elif plj['type'] == 'ack':
             self.process_client_ack(plj)
 
+
+    def send_client_comm(self, text):
+        if not self.user.connection_state == 200:
+            return
+
+        if not self.peers[self.peer_connected].connection_state == 200:
+            return
+
+        dst_sym_key = self.peers[self.peer_connected].sa_data
+        dst_id = self.peers[self.peer_connected].id
+        ciphered_data = base64.encodestring(self.sec.encrypt_with_symmetric(text, dst_sym_key))
+
+        msg = json.dumps({'type': 'client-com', 'src': self.user.id, 'dst': dst_id, 'data': ciphered_data})
+        msg_secure = self.sec.encrypt_with_symmetric( msg, self.sym_key)
+        msg_secure_ciphered = json.dumps({'type': 'secure', 'sa-data': 'not used', 'payload': msg_secure})
+        self.send_message(msg_secure_ciphered)
+
+
+
     def process_client_connect(self, ccj):
         if self.user.connection_state != 200:
             return
@@ -222,7 +242,7 @@ class ConnectionManager(QtCore.QThread):
                               "data": "sup"})
 
             ciphered_pl = base64.encodestring(self.sec.encrypt_with_symmetric(msg, self.sym_key))
-            secure_msg = {'type': 'secure', 'payload': ciphered_pl}
+            secure_msg = {'type': 'secure', 'sa-data': 'not used', 'payload': ciphered_pl}
 
             self.send_message(json.dumps(secure_msg))
 

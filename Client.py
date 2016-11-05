@@ -68,7 +68,7 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
         if not text or text == "\n":
             return
         self.textBrowser.append(text)
-        self.comm.send_message(text + "\n\n")
+        self.comm.send_client_comm(text)
         self.msgBox.clear()
 
     def list_users(self, user_list):
