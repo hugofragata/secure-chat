@@ -77,8 +77,8 @@ class ConnectionManager(QtCore.QThread):
                 # error??
 
     def s_connect(self):
-        self.id = time.time()
-        msg = self.form_json_connect(1, self.user.name, self.id , SUPPORTED_CIPHER_SUITES, "")
+        self.user.id = time.time()
+        msg = self.form_json_connect(1, self.user.name, self.user.id, SUPPORTED_CIPHER_SUITES, "")
         self.send_message(msg)
         self.connect_state += 1
         self.connecting_event.clear()
@@ -208,7 +208,7 @@ class ConnectionManager(QtCore.QThread):
             if not self.client_connect_state[ccj['src']] == None:
                 return
 
-            msg = json.dumps({"type": "client-connect", "src": self.id, "dst": ccj['src'], "phase": 2, "ciphers": SUPPORTED_CIPHER_SUITES,
+            msg = json.dumps({"type": "client-connect", "src": self.user.id, "dst": ccj['src'], "phase": 2, "ciphers": SUPPORTED_CIPHER_SUITES,
                               "data": "sup"})
 
             ciphered_pl = base64.encodestring(self.sec.encrypt_with_symmetric(msg, self.sym_key))
