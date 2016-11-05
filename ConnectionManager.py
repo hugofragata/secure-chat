@@ -218,10 +218,18 @@ class ConnectionManager(QtCore.QThread):
         self.send_message(msg_secure_ciphered)
 
     def process_client_com(self, payload_j):
-        peer_id = self.peers[self.peer_connected].id
-        if not payload_j['src'] == peer_id:
-            return
         if not self.user.connection_state == 200:
+            return
+        if self.peer_connected != payload_j['src']:
+            if payload_j['src'] in self.peers.keys():
+                if self.peers[payload_j['src']].connection_state == 200:
+                    ciphered_data = payload_j['data']
+                    peer_sym_key = self.peers[payload_j['src']].sa_data
+                    deciphered_data = self.sec.decrypt_with_symmetric(base64.decodestring(ciphered_data), peer_sym_key)
+                    self.peers[payload_j['src']].buffin += deciphered_data + "\n\n"
+                    return
+        if self.peers[self.peer_connected].connection_state != 200:
+            #TODO disconnect peer?
             return
         ciphered_data = payload_j['data']
         peer_sym_key = self.peers[self.peer_connected].sa_data
@@ -253,7 +261,9 @@ class ConnectionManager(QtCore.QThread):
             return
         if not all(k in ccj.keys() for k in ("src", "dst", "phase", "id", "ciphers")):
             return
-
+        if self.peer_connected == ccj['src']:
+            print "already connected"
+            return
         if ccj['phase'] == 1:
             if ccj['src'] not in self.peers:
                 self.peers[ccj['src']] = User(ccj['data'], uid=ccj['src'])
@@ -362,7 +372,7 @@ class ConnectionManager(QtCore.QThread):
                 secure_msg = {'type': 'secure', 'sa-data': 'aa', 'payload': ciphered_pl}
                 self.send_message(json.dumps(secure_msg))
                 self.peers[ccj['src']].connection_state = 200
-                self.peer_connected = ccj['src']
+                #self.peer_connected = ccj['src']
                 print "connected to peer \n\n\n\n"
             elif self.peers[ccj['src']].cipher_suite == SUPPORTED_CIPHER_SUITES[1]:
                 # TODO: DH
@@ -395,6 +405,10 @@ class ConnectionManager(QtCore.QThread):
             return
         if self.peers[dst].connection_state == 200:
             self.peer_connected = dst
+            for temp in self.peers[dst].buffin.split(TERMINATOR):
+                if temp != "\n" and temp != "":
+                    self.emit(self.signal, temp)
+            self.peers[dst].buffin = ""
             return
         else:
             msg = json.dumps(
@@ -413,11 +427,14 @@ class ConnectionManager(QtCore.QThread):
             return
         if not self.user.connection_state == 200:
             return
-        if not self.peer_connected == cdj['src']:
+        if cdj['src'] not in self.peers.keys():
             return
-
-        del self.peers[self.peer_connected]
-        self.peer_connected = None
+        if self.peers[cdj['src']].connection_state != 200:
+            del self.peers[cdj['src']]
+            return
+        del self.peers[cdj['src']]
+        if self.peer_connected == cdj['src']:
+            self.peer_connected = None
         return
 
     def get_user_lists(self):

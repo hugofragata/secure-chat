@@ -83,7 +83,6 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
         self.textBrowser.clear()
         self.textBrowser.setPlainText("Connecting to " + item.user_name)
         self.comm.start_client_connect(item.user_id)
-        self.textBrowser.setPlainText("Connected")
         self.setWindowTitle("I am " + self.comm.user.name + ", talking to " + item.user_name)
 
     def updateChat(self, text):

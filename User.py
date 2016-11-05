@@ -9,4 +9,5 @@ class User:
         self.connection_state = 1
         self.cipher_suite = None
         self.conn_check = None
+        self.buffin = ""
 
