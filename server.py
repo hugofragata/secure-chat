@@ -50,7 +50,7 @@ class Client:
         return "Client(id=%r addr:%s name:%s level:%d state:%d)" % (self.id, str(self.addr), self.name, self.level, self.state)
 
     def asDict(self):
-        return {'id': self.id, 'level': self.level}
+        return {'name': self.name, 'id': self.id, 'level': self.level}
 
     def setState(self, state):
         if state not in [STATE_CONNECTED, STATE_NONE, STATE_DISCONNECTED]:
@@ -368,7 +368,7 @@ class Server:
         if sender.level != 200:
             return
 
-        pl =  json.dumps({'type': 'list', 'data': self.clientList()})
+        pl = json.dumps({'type': 'list', 'data': self.clientList()})
         plc = base64.encodestring(self.sec.encrypt_with_symmetric(pl, sender.sa_data))
         sender.send({'type': 'secure', 'payload': plc})
 

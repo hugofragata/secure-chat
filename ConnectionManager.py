@@ -29,6 +29,7 @@ class ConnectionManager(QtCore.QThread):
         self.connect_state = 1
         QtCore.QThread.__init__(self, parent=gui)
         self.signal = QtCore.SIGNAL("newMsg")
+        self.list_signal = QtCore.SIGNAL("userList")
         try:
             self.s = socket.create_connection((ip, port))
         except:
@@ -192,19 +193,26 @@ class ConnectionManager(QtCore.QThread):
         if plj['type'] == 'list':
             self.process_list(plj)
         elif plj['type'] == 'client-connect':
-            self.proces_client_connect(plj)
+            self.process_client_connect(plj)
         elif plj['type'] == 'client-disconnect':
-            self.proces_client_disconnect(plj)
+            self.process_client_disconnect(plj)
         elif plj['type'] == 'client-com':
-            self.proces_client_com(plj)
+            self.process_client_com(plj)
         elif plj['type'] == 'ack':
-            self.proces_client_ack(plj)
+            self.process_client_ack(plj)
 
     def get_user_lists(self):
         get_list = {'type': 'list', 'data': 'passa ai os users sff'}
         get_list = self.sec.encrypt_with_symmetric(json.dumps(get_list), self.sym_key)
         msg = {'type': 'secure', 'sa-data': 'aa', 'data': get_list}
         self.send_message(json.dumps(msg))
+
+    def process_list(self, data):
+        if 'data' not in data.keys():
+            return
+        user_list = data['data']
+        self.emit(self.list_signal, data['data'])
+
 
     @staticmethod
     def is_ip_address(ip):

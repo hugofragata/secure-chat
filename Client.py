@@ -52,6 +52,7 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
                 return
             else:
                 self.connect(self.comm, self.comm.signal, self.updateChat)
+                self.connect(self.comm, self.comm.list_signal, self.list_users)
                 self.comm.s_connect()
                 QtGui.QApplication.restoreOverrideCursor()
                 return self.login_dialog.accept()
@@ -66,6 +67,11 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
         self.textBrowser.append(text)
         self.comm.send_message(text + "\n\n")
         self.msgBox.clear()
+
+    def list_users(self, user_list):
+        for user in user_list:
+            self.listWidget.addItem(user['name'])
+
 
     def updateChat(self, text):
         self.textBrowser.append("<span>" + QtCore.QString.fromLatin1(text, len(text)) + "</span>")
