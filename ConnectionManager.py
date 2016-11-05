@@ -204,8 +204,6 @@ class ConnectionManager(QtCore.QThread):
             return
         if not self.connect_state == 200:
             return
-
-
         if ccj['phase'] == 1:
             if not self.client_connect_state[ccj['src']] == None:
                 return
@@ -241,8 +239,6 @@ class ConnectionManager(QtCore.QThread):
             if not self.client_connect_state[ccj['src']] == 5:
                 return
 
-
-
     def start_client_connect(self, dst):
         #TODO everything
         self.client_connect_state[dst] = 1
@@ -257,7 +253,6 @@ class ConnectionManager(QtCore.QThread):
         self.client_connect_state[cdj['src']] = None
         return
 
-
     def get_user_lists(self):
         get_list = {'type': 'list', 'data': 'passa ai os users sff'}
         get_list = self.sec.encrypt_with_symmetric(json.dumps(get_list), self.sym_key)
@@ -267,9 +262,7 @@ class ConnectionManager(QtCore.QThread):
     def process_list(self, data):
         if 'data' not in data.keys():
             return
-        user_list = data['data']
         self.emit(self.list_signal, data['data'])
-
 
     @staticmethod
     def is_ip_address(ip):

@@ -21,6 +21,7 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
         self.diag_ui.setupUi(self.login_dialog)
         self.diag_ui.pushButton.clicked.connect(self.login)
         self.sendButton.clicked.connect(self.sendMsg)
+        self.listWidget.itemDoubleClicked.connect(self.connect_to_user)
         self.msgBox.installEventFilter(self)
         accept = self.login_dialog.exec_()
         if accept == 0:
@@ -72,6 +73,9 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
     def list_users(self, user_list):
         for user in user_list:
             self.listWidget.addItem(user['name'])
+
+    def connect_to_user(self, item):
+        print item.text()
 
     def updateChat(self, text):
         self.textBrowser.append("<span>" + QtCore.QString.fromLatin1(text, len(text)) + "</span>")
