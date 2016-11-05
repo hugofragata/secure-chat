@@ -386,24 +386,32 @@ class Server:
 
         # This is a secure message.
         # TODO: Inner message is encrypted for us. Must decrypt and validate.
-        if not 'type' in request['payload'].keys():
+        plc = base64.decodestring(req['payload'])
+        pl = self.sec.decrypt_with_symmetric(plc, self.sym_key)
+        plj = json.loads(pl)
+
+        if not 'type' in plj.keys():
             logging.warning("Secure message without inner frame type")
             return
 
-        if request['payload']['type'] == 'list':
-            self.processList(sender, request['payload'])
+        if plj['type'] == 'list':
+            self.processList(sender, plj)
             return
 
-        if not all (k in request['payload'].keys() for k in ("src", "dst")):
+        if not all (k in plj.keys() for k in ("src", "dst")):
             return
 
-        if not request['payload']['dst'] in self.id2client.keys():
-            logging.warning("Message to unknown client: %s" % request['payload']['dst'])
+        if not plj['dst'] in self.id2client.keys():
+            logging.warning("Message to unknown client: %s" % plj['dst'])
             return
 
-        dst = self.id2client[request['payload']['dst']]
+        dst = self.id2client[plj['dst']]
 
-        dst_message = {'type': 'secure', 'payload': request['payload']}
+
+        pl_to_peer = json.dumps(plj)
+        ciphered_pl_to_peer = base64.encodestring(self.sec.encrypt_with_symmetric(pl_to_peer, dst.sa_data))
+
+        dst_message = {'type': 'secure', 'payload': ciphered_pl_to_peer}
         dst.send(dst_message)
 
 
