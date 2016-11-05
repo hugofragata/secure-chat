@@ -2,6 +2,7 @@
 import sys
 from loginDialog import *
 from ConnectionManager import ConnectionManager, ConnectionManagerError
+from CustomListItem import UserListItem
 import t
 from User import User
 try:
@@ -72,10 +73,12 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
 
     def list_users(self, user_list):
         for user in user_list:
-            self.listWidget.addItem(user['name'])
+            item = UserListItem(user['name'], user['id'])
+            self.listWidget.addItem(item)
 
     def connect_to_user(self, item):
         print item.text()
+        print item.user_id
 
     def updateChat(self, text):
         self.textBrowser.append("<span>" + QtCore.QString.fromLatin1(text, len(text)) + "</span>")
