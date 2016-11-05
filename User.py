@@ -2,9 +2,9 @@
 
 class User:
 
-    def __init__(self, name):
+    def __init__(self, name, uid=None):
         self.name = name
-        self.id = None
+        self.id = uid
         self.sa_data = None
         self.connection_state = 1
 

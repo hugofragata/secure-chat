@@ -3,6 +3,7 @@ import socket
 from select import *
 import threading
 import time
+from User import User
 from PyQt4 import QtCore
 from security import *
 import base64
@@ -26,8 +27,8 @@ class ConnectionManager(QtCore.QThread):
         self.out_buffer = ""
         self.in_buffer = ""
         # TODO: change connect_state to a enum? CONNECTED, etc
-        self.connect_state = 1
-        self.client_connect_state = {}
+        # Dic with id:User
+        self.peers = {}
         QtCore.QThread.__init__(self, parent=gui)
         self.signal = QtCore.SIGNAL("newMsg")
         self.list_signal = QtCore.SIGNAL("userList")
@@ -80,10 +81,10 @@ class ConnectionManager(QtCore.QThread):
         self.user.id = time.time()
         msg = self.form_json_connect(1, self.user.name, self.user.id, SUPPORTED_CIPHER_SUITES, "")
         self.send_message(msg)
-        self.connect_state += 1
+        self.user.connection_state += 1
         self.connecting_event.clear()
         self.connecting_event.wait(timeout=30)
-        if self.connect_state != 200:
+        if self.user.connection_state != 200:
             return False
         return True
 
@@ -139,7 +140,7 @@ class ConnectionManager(QtCore.QThread):
 
     def process_connect(self, req):
         if req['phase'] == 2:
-            if self.connect_state != 2:
+            if self.user.connection_state != 2:
                 return
             if req['ciphers'] not in SUPPORTED_CIPHER_SUITES:
                 msg = {'type': 'connect', 'phase': req['phase'] + 1, 'name': self.user.name, 'id': time.time(),
@@ -151,10 +152,10 @@ class ConnectionManager(QtCore.QThread):
             msg = {'type': 'connect', 'phase': req['phase'] + 1, 'name': self.user.name, 'id': time.time(),
                    'ciphers': self.cipher_suite, 'data': 'ok b0ss'}
             self.send_message(json.dumps(msg))
-            self.connect_state += 1
+            self.user.connection_state += 1
 
         if req['phase'] == 4:
-            if self.connect_state != 3:
+            if self.user.connection_state != 3:
                 return
             if self.cipher_suite == SUPPORTED_CIPHER_SUITES[0]:
                 if len(req['data']) == 0:
@@ -167,14 +168,14 @@ class ConnectionManager(QtCore.QThread):
                 msg = {'type': 'connect', 'phase': req['phase'] + 1, 'name': self.user.name, 'id': time.time(),
                        'ciphers': self.cipher_suite, 'data': to_send}
                 self.send_message(json.dumps(msg))
-                self.connect_state += 1
+                self.user.connection_state += 1
                 self.connect_check = self.sec.get_hash(bytes(str(msg['id']) + msg['data']))
             elif self.cipher_suite == SUPPORTED_CIPHER_SUITES[1]:
                 # TODO: DH
                 pass
 
         if req['phase'] == 6:
-            if self.connect_state != 4:
+            if self.user.connection_state != 4:
                 return
             if len(req['data']) == 0:
                 return
@@ -183,7 +184,7 @@ class ConnectionManager(QtCore.QThread):
                 if check != self.connect_check:
                     print "erro1"
                     raise ConnectionManagerError
-                self.connect_state = 200
+                self.user.connection_state = 200
                 self.connecting_event.set()
                 # Connected!
             elif self.cipher_suite == SUPPORTED_CIPHER_SUITES[1]:
@@ -191,8 +192,7 @@ class ConnectionManager(QtCore.QThread):
                 pass
 
     def process_secure(self, req):
-
-        if self.connect_state != 200:
+        if self.user.connection_state != 200:
             return
         pl = self.sec.decrypt_with_symmetric(base64.decodestring(req['payload']), self.sym_key)
         plj = json.loads(pl)
@@ -209,14 +209,15 @@ class ConnectionManager(QtCore.QThread):
             self.process_client_ack(plj)
 
     def process_client_connect(self, ccj):
-        if not ccj['type'] == 'client-connect':
+        if self.user.connection_state != 200:
             return
-        if not self.connect_state == 200:
+        if not all(k in ccj.keys() for k in ("src", "dst", "phase", "id", "ciphers")):
             return
-        if ccj['phase'] == 1:
-            if not self.client_connect_state[ccj['src']] == None:
-                return
 
+        if ccj['phase'] == 1:
+            if ccj['src'] not in self.peers:
+                print "unknown user"
+                return
             msg = json.dumps({"type": "client-connect", "src": self.user.id, "dst": ccj['src'], "phase": 2, "ciphers": SUPPORTED_CIPHER_SUITES,
                               "data": "sup"})
 
@@ -256,7 +257,7 @@ class ConnectionManager(QtCore.QThread):
     def process_client_disconnect(self, cdj):
         if not cdj['type'] == 'client-disconnect':
             return
-        if not self.connect_state == 200:
+        if not self.user.connection_state == 200:
             return
 
         self.client_connect_state[cdj['src']] = None
@@ -271,6 +272,8 @@ class ConnectionManager(QtCore.QThread):
     def process_list(self, data):
         if 'data' not in data.keys():
             return
+        for u in data['data']:
+            self.peers[u['id']] = User(u['name'], uid=u['id'])
         self.emit(self.list_signal, data['data'])
 
     @staticmethod
