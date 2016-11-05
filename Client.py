@@ -77,8 +77,8 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
             self.listWidget.addItem(item)
 
     def connect_to_user(self, item):
-        self.msgBox.clear()
-        self.msgBox.setPlainText("Connecting to " + item.user_name)
+        self.textBrowser.clear()
+        self.textBrowser.setPlainText("Connecting to " + item.user_name)
         self.comm.start_client_connect(item.user_id)
 
     def updateChat(self, text):
