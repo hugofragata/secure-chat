@@ -77,7 +77,8 @@ class ConnectionManager(QtCore.QThread):
                 # error??
 
     def s_connect(self):
-        msg = self.form_json_connect(1, self.user.name, time.time(), SUPPORTED_CIPHER_SUITES, "")
+        self.id = time.time()
+        msg = self.form_json_connect(1, self.user.name, self.id , SUPPORTED_CIPHER_SUITES, "")
         self.send_message(msg)
         self.connect_state += 1
         self.connecting_event.clear()
@@ -208,18 +209,57 @@ class ConnectionManager(QtCore.QThread):
         if not self.connect_state == 200:
             return
 
-        if ccj['phase'] == 4:
-            if not self.client_connect_state[ccj['dst']] == 4:
+
+        if ccj['phase'] == 1:
+            if not self.client_connect_state[ccj['src']] == None:
+                return
+
+            msg = json.dumps({"type": "client-connect", "src": self.id, "dst": ccj['src'], "phase": 2, "ciphers": SUPPORTED_CIPHER_SUITES,
+                              "data": "sup"})
+
+            ciphered_pl = base64.encodestring(self.sec.encrypt_with_symmetric(msg, self.sym_key))
+            secure_msg = {'type': 'secure', 'payload': ciphered_pl}
+
+            self.send_message(json.dumps(secure_msg))
+
+            self.client_connect_state[ccj['dst']] = 2
+
+        elif ccj['phase'] == 2:
+            if not self.client_connect_state[ccj['src']] == 1:
+                return
+
+
+        elif ccj['phase'] == 3:
+            if not self.client_connect_state[ccj['src']] == 2:
+                return
+
+        elif ccj['phase'] == 4:
+            if not self.client_connect_state[ccj['src']] == 3:
+                return
+
+        elif ccj['phase'] == 5:
+            if not self.client_connect_state[ccj['src']] == 4:
                 return
 
         elif ccj['phase'] == 6:
-            if not self.client_connect_state[ccj['dst']] == 4:
+            if not self.client_connect_state[ccj['src']] == 5:
                 return
+
+
 
     def start_client_connect(self, dst):
         #TODO everything
         self.client_connect_state[dst] = 1
         pass
+
+    def process_client_disconnect(self, cdj):
+        if not cdj['type'] == 'client-disconnect':
+            return
+        if not self.connect_state == 200:
+            return
+
+        self.client_connect_state[cdj['src']] = None
+        return
 
 
     def get_user_lists(self):
