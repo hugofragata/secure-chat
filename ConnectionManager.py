@@ -33,6 +33,7 @@ class ConnectionManager(QtCore.QThread):
         QtCore.QThread.__init__(self, parent=gui)
         self.signal = QtCore.SIGNAL("newMsg")
         self.list_signal = QtCore.SIGNAL("userList")
+        self.error_signal = QtCore.SIGNAL("errorSig")
         try:
             self.s = socket.create_connection((ip, port))
         except:
@@ -268,6 +269,8 @@ class ConnectionManager(QtCore.QThread):
             if ccj['src'] not in self.peers:
                 self.peers[ccj['src']] = User(ccj['data'], uid=ccj['src'])
             elif self.peers[ccj['src']].connection_state != 1:
+                del self.peers[ccj['src']]
+                self.send_client_disconnect(ccj['src'])
                 return
             # TODO: choose suite
             msg = json.dumps({"type": "client-connect", 'id': time.time(), "src": self.user.id, "dst": ccj['src'], "phase": 2, "ciphers": ccj['ciphers'][0],
@@ -279,33 +282,39 @@ class ConnectionManager(QtCore.QThread):
 
         elif ccj['phase'] == 2:
             if ccj['src'] not in self.peers:
-                print "unknown user"
+                self.emit(self.error_signal, "Erro a ligar ao utilizador!")
+                self.send_client_disconnect(ccj['src'])
                 return
             if self.peers[ccj['src']].connection_state != 2:
+                del self.self.peers[ccj['src']]
+                self.emit(self.error_signal, "Erro a ligar ao utilizador!")
+                self.send_client_disconnect(ccj['src'])
                 return
             if ccj['ciphers'] not in SUPPORTED_CIPHER_SUITES:
-                print "unsupported cipher suite"
-                # TODO: delete peer?
+                self.emit(self.error_signal, "Erro a ligar ao utilizador! (Unsupported cipher suite)")
                 msg = json.dumps({"type": "client-connect", 'id': time.time(), "src": self.user.id, "dst": ccj['src'], "phase": 3, "ciphers": ccj['ciphers'],
                               "data": "not supported"})
+                del self.peers[ccj['src']]
             else:
                 msg = json.dumps({"type": "client-connect", 'id': time.time(), "src": self.user.id, "dst": ccj['src'], "phase": 3, "ciphers": ccj['ciphers'],
                               "data": "ok b0ss"})
                 self.peers[ccj['src']].cipher_suite = ccj['ciphers']
+                self.peers[ccj['src']].connection_state = 3
             ciphered_pl = base64.encodestring(self.sec.encrypt_with_symmetric(msg, self.sym_key))
             secure_msg = {'type': 'secure', 'sa-data': 'aa', 'payload': ciphered_pl}
             self.send_message(json.dumps(secure_msg))
-            self.peers[ccj['src']].connection_state = 3
 
         elif ccj['phase'] == 3:
             if ccj['src'] not in self.peers:
-                print "unknown user"
+                self.send_client_disconnect(ccj['src'])
                 return
             if self.peers[ccj['src']].connection_state != 2:
+                del self.self.peers[ccj['src']]
+                self.send_client_disconnect(ccj['src'])
                 return
             if ccj['data'] != "ok b0ss":
-                print "cipher suite negotiation error"
-                #TODO: del peer?
+                del self.self.peers[ccj['src']]
+                self.send_client_disconnect(ccj['src'])
                 return
             self.peers[ccj['src']].cipher_suite = ccj['ciphers']
             if self.peers[ccj['src']].cipher_suite == SUPPORTED_CIPHER_SUITES[0]:
@@ -326,12 +335,18 @@ class ConnectionManager(QtCore.QThread):
 
         elif ccj['phase'] == 4:
             if ccj['src'] not in self.peers:
-                print "unknown user"
+                self.emit(self.error_signal, "Erro a ligar ao utilizador!")
+                self.send_client_disconnect(ccj['src'])
                 return
             if self.peers[ccj['src']].connection_state != 3:
+                self.emit(self.error_signal, "Erro a ligar ao utilizador!")
+                self.send_client_disconnect(ccj['src'])
+                del self.peers[ccj['src']]
                 return
             if ccj['ciphers'] != self.peers[ccj['src']].cipher_suite:
-                print "cipher suite error"
+                self.emit(self.error_signal, "Erro a ligar ao utilizador!")
+                self.send_client_disconnect(ccj['src'])
+                del self.peers[ccj['src']]
                 return
             if self.peers[ccj['src']].cipher_suite == SUPPORTED_CIPHER_SUITES[0]:
                 user_pubkey = self.sec.rsa_public_pem_to_key(base64.decodestring(ccj['data']))
@@ -352,12 +367,15 @@ class ConnectionManager(QtCore.QThread):
 
         elif ccj['phase'] == 5:
             if ccj['src'] not in self.peers:
-                print "unknown user"
+                self.send_client_disconnect(ccj['src'])
                 return
             if self.peers[ccj['src']].connection_state != 3:
+                self.send_client_disconnect(ccj['src'])
+                del self.peers[ccj['src']]
                 return
             if ccj['ciphers'] != self.peers[ccj['src']].cipher_suite:
-                print "cipher suite error"
+                self.send_client_disconnect(ccj['src'])
+                del self.peers[ccj['src']]
                 return
             if self.peers[ccj['src']].cipher_suite == SUPPORTED_CIPHER_SUITES[0]:
                 self.peers[ccj['src']].sa_data = self.sec.rsa_decrypt_with_private_key(base64.decodestring(ccj['data']), self.peers[ccj['src']].sa_data)
@@ -372,7 +390,6 @@ class ConnectionManager(QtCore.QThread):
                 secure_msg = {'type': 'secure', 'sa-data': 'aa', 'payload': ciphered_pl}
                 self.send_message(json.dumps(secure_msg))
                 self.peers[ccj['src']].connection_state = 200
-                #self.peer_connected = ccj['src']
                 print "connected to peer \n\n\n\n"
             elif self.peers[ccj['src']].cipher_suite == SUPPORTED_CIPHER_SUITES[1]:
                 # TODO: DH
@@ -380,22 +397,31 @@ class ConnectionManager(QtCore.QThread):
 
         elif ccj['phase'] == 6:
             if ccj['src'] not in self.peers:
-                print "unknown user"
+                self.emit(self.error_signal, "Erro a ligar ao utilizador!")
+                self.send_client_disconnect(ccj['src'])
                 return
             if self.peers[ccj['src']].connection_state != 4:
+                self.emit(self.error_signal, "Erro a ligar ao utilizador!")
+                self.send_client_disconnect(ccj['src'])
+                del self.peers[ccj['src']]
                 return
             if ccj['ciphers'] != self.peers[ccj['src']].cipher_suite:
-                print "cipher suite error"
+                self.emit(self.error_signal, "Erro a ligar ao utilizador!")
+                self.send_client_disconnect(ccj['src'])
+                del self.peers[ccj['src']]
                 return
             if self.peers[ccj['src']].cipher_suite == SUPPORTED_CIPHER_SUITES[0]:
                 check = self.sec.decrypt_with_symmetric(base64.decodestring(ccj['data']), self.peers[ccj['src']].sa_data)
                 if check != self.peers[ccj['src']].conn_check:
-                    print "client comm shared secret error"
-                    raise ConnectionManagerError
+                    self.emit(self.error_signal, "Erro a ligar ao utilizador! (shared secret error)")
+                    self.send_client_disconnect(ccj['src'])
+                    del self.peers[ccj['src']]
+                    return
                 self.peers[ccj['src']].connection_state = 200
                 self.peers[ccj['src']].conn_check = None
                 print "connected phase 6"
                 self.peer_connected = ccj['src']
+                self.emit(self.signal, "Connected")
             elif self.peers[ccj['src']].cipher_suite == SUPPORTED_CIPHER_SUITES[1]:
                 # TODO: DH
                 pass
@@ -405,6 +431,7 @@ class ConnectionManager(QtCore.QThread):
             return
         if self.peers[dst].connection_state == 200:
             self.peer_connected = dst
+            self.emit(self.signal, "Connected")
             for temp in self.peers[dst].buffin.split(TERMINATOR):
                 if temp != "\n" and temp != "":
                     self.emit(self.signal, temp)
@@ -422,19 +449,29 @@ class ConnectionManager(QtCore.QThread):
             self.peers[dst].connection_state = 2
         pass
 
+    def send_client_disconnect(self, peer):
+        if peer in self.peers.keys():
+            del self.peers[peer]
+        if self.peer_connected == peer:
+            self.peer_connected = None
+        msg = json.dumps({"type": "client-disconnect", 'id': time.time(), "src": self.user.id, "dst": peer})
+        ciphered_pl = self.sec.encrypt_with_symmetric(msg, self.sym_key)
+        ciphered_pl = base64.encodestring(ciphered_pl)
+        secure_msg = {'type': 'secure', 'sa-data': 'aa', 'payload': ciphered_pl}
+        self.send_message(json.dumps(secure_msg))
+        self.get_user_lists()
+
     def process_client_disconnect(self, cdj):
-        if not cdj['type'] == 'client-disconnect':
-            return
         if not self.user.connection_state == 200:
             return
         if cdj['src'] not in self.peers.keys():
             return
         if self.peers[cdj['src']].connection_state != 200:
-            del self.peers[cdj['src']]
-            return
+            self.emit(self.error_signal, "Erro no peer")
         del self.peers[cdj['src']]
         if self.peer_connected == cdj['src']:
             self.peer_connected = None
+        self.get_user_lists()
         return
 
     def get_user_lists(self):

@@ -5,7 +5,6 @@
 
 # vim setings:
 # :set expandtab ts=4
-import server_crypt_utils
 from socket import *
 from select import *
 from security import *

@@ -56,6 +56,7 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
             else:
                 self.connect(self.comm, self.comm.signal, self.updateChat)
                 self.connect(self.comm, self.comm.list_signal, self.list_users)
+                self.connect(self.comm, self.comm.error_signal, self.show_error)
                 self.comm.s_connect()
                 QtGui.QApplication.restoreOverrideCursor()
                 return self.login_dialog.accept()
@@ -87,6 +88,14 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
 
     def updateChat(self, text):
         self.textBrowser.append("<span>" + self.comm.peers[self.comm.peer_connected].name + "> " + QtCore.QString.fromLatin1(text, len(text)) + "</span>")
+
+    def show_error(self, error):
+        errorDiag = QtGui.QMessageBox()
+        errorDiag.setIcon(QtGui.QMessageBox.Critical)
+        errorDiag.setText(error)
+        errorDiag.setWindowTitle("Error")
+        errorDiag.setStandardButtons(QtGui.QMessageBox.Ok)
+        errorDiag.exec_()
 
     def eventFilter(self, obj, event):
         if event.type() == QtCore.QEvent.KeyPress and obj == self.msgBox:

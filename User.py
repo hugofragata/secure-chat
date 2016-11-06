@@ -10,4 +10,3 @@ class User:
         self.cipher_suite = None
         self.conn_check = None
         self.buffin = ""
-
