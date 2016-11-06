@@ -34,6 +34,7 @@ class ConnectionManager(QtCore.QThread):
         self.signal = QtCore.SIGNAL("newMsg")
         self.list_signal = QtCore.SIGNAL("userList")
         self.error_signal = QtCore.SIGNAL("errorSig")
+        self.change_list = QtCore.SIGNAL("changeList")
         try:
             self.s = socket.create_connection((ip, port))
         except:
@@ -228,6 +229,7 @@ class ConnectionManager(QtCore.QThread):
                     peer_sym_key = self.peers[payload_j['src']].sa_data
                     deciphered_data = self.sec.decrypt_with_symmetric(base64.decodestring(ciphered_data), peer_sym_key)
                     self.peers[payload_j['src']].buffin += deciphered_data + "\n\n"
+                    self.emit(self.change_list, payload_j['src'])
                     return
         if self.peers[self.peer_connected].connection_state != 200:
             #TODO disconnect peer?
@@ -390,6 +392,7 @@ class ConnectionManager(QtCore.QThread):
                 secure_msg = {'type': 'secure', 'sa-data': 'aa', 'payload': ciphered_pl}
                 self.send_message(json.dumps(secure_msg))
                 self.peers[ccj['src']].connection_state = 200
+                self.emit(self.change_list, ccj['src'])
                 print "connected to peer \n\n\n\n"
             elif self.peers[ccj['src']].cipher_suite == SUPPORTED_CIPHER_SUITES[1]:
                 # TODO: DH

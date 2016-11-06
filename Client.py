@@ -57,6 +57,7 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
                 self.connect(self.comm, self.comm.signal, self.updateChat)
                 self.connect(self.comm, self.comm.list_signal, self.list_users)
                 self.connect(self.comm, self.comm.error_signal, self.show_error)
+                self.connect(self.comm, self.comm.change_list, self.change_listitem)
                 self.comm.s_connect()
                 QtGui.QApplication.restoreOverrideCursor()
                 return self.login_dialog.accept()
@@ -80,10 +81,27 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
             item = UserListItem(user['name'], user['id'])
             self.listWidget.addItem(item)
 
+    def change_listitem(self, uid):
+        for i in xrange(self.listWidget.count()):
+            item = self.listWidget.item(i)
+            if item.user_id == uid:
+                if item.num == 0:
+                    new_text = item.user_name + " (new messages)"
+                    item.setText(new_text)
+                    item.num += 1
+                else:
+                    new_text = item.user_name + " (" + str(item.num) + ")"
+                    item.setText(new_text)
+                    item.num += 1
+                item.setTextColor(QtGui.QColor(_fromUtf8("red")))
+
     def connect_to_user(self, item):
         self.textBrowser.clear()
         self.textBrowser.setPlainText("Connecting to " + item.user_name)
         self.comm.start_client_connect(item.user_id)
+        item.setText(item.user_name)
+        item.num = 0
+        item.setTextColor(QtGui.QColor(_fromUtf8("black")))
         self.setWindowTitle("I am " + self.comm.user.name + ", talking to " + item.user_name)
 
     def updateChat(self, text):
