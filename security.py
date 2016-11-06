@@ -98,8 +98,11 @@ class security:
             return True
 
     def rsa_encrypt_with_public_key(self, text, public_key):
-        if not isinstance(public_key, rsa.RSAPublicKey):
-            raise security_error
+        print public_key
+        print "\n\n"
+        print type(public_key)
+        #if not isinstance(public_key, rsa.RSAPublicKey):
+        #    raise security_error
 
         cipher_text = public_key.encrypt(text,
                                         padding.OAEP(
@@ -164,6 +167,37 @@ class security:
         digest = hashes.Hash(hashes.SHA256(), backend=default_backend())
         digest.update(text)
         return digest.finalize()
+
+    def get_hmac_client_com(self, src, dst, ciphered_data, peer_sym_key):
+        """
+
+        :param src:
+        :param dst:
+        :param ciphered_data:
+        :param peer_sym_key:
+        :return: Produces a HMAC according to RFC 2104 for 'client-com' type requests
+        """
+        m1 = str(peer_sym_key) + str(src) + str(dst) + str(ciphered_data)
+        h1 = self.get_hash(m1)
+        m2 = str(peer_sym_key) + h1
+        h2 = self.get_hash(m2)
+        return h2
+
+    def verify_hmac_client_com(self, src, dst, ciphered_data, peer_sym_key, hmac_value):
+        """
+        :param src:
+        :param dst:
+        :param ciphered_data:
+        :param peer_sym_key:
+        :param hmac_value:
+        :return:  Verifies a HMAC according to RFC 2104 for 'client-com' type requests
+        """
+        m1 = str(peer_sym_key) + str(src) + str(dst) + str(ciphered_data)
+        h1 = self.get_hash(m1)
+        m2 = str(peer_sym_key) + h1
+        h2 = self.get_hash(m2)
+        return  hmac_value == h2
+
 
 
 class security_error:
