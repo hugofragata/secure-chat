@@ -24,6 +24,8 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
         self.sendButton.clicked.connect(self.sendMsg)
         self.listWidget.itemDoubleClicked.connect(self.connect_to_user)
         self.msgBox.installEventFilter(self)
+        self.actionRSA_WITH_AES_128.triggered.connect(self.change_client_clientRSA)
+        self.actionECDHE_WITH_AES_128.triggered.connect(self.change_client_clientDH)
         accept = self.login_dialog.exec_()
         if accept == 0:
             quit()
@@ -71,6 +73,14 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
             QtGui.QApplication.restoreOverrideCursor()
             return
 
+    def change_client_clientRSA(self):
+        if self.actionECDHE_WITH_AES_128.isChecked():
+            self.actionECDHE_WITH_AES_128.toggle()
+
+    def change_client_clientDH(self):
+        if self.actionRSA_WITH_AES_128.isChecked():
+            self.actionRSA_WITH_AES_128.toggle()
+
     def sendMsg(self):
         text = self.msgBox.toPlainText()
         if not text or text == "\n":
@@ -104,7 +114,12 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
     def connect_to_user(self, item):
         self.textBrowser.clear()
         self.textBrowser.setPlainText("Connecting to " + item.user_name)
-        self.comm.start_client_connect(item.user_id)
+        if self.actionRSA_WITH_AES_128.isChecked():
+            self.comm.start_client_connect(item.user_id, cipher_suite=1)
+        elif self.actionECDHE_WITH_AES_128.isChecked():
+            self.comm.start_client_connect(item.user_id, cipher_suite=2)
+        else:
+            self.comm.start_client_connect(item.user_id, cipher_suite=1)
         item.setText(item.user_name)
         item.num = 0
         item.setTextColor(QtGui.QColor(_fromUtf8("black")))
