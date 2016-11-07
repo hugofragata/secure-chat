@@ -12,6 +12,7 @@ import json
 import sys
 import time
 import logging
+from cryptography.fernet import InvalidToken
 
 # Server address
 HOST = ""   # All available interfaces
@@ -414,7 +415,11 @@ class Server:
         # This is a secure message.
         sender.num_msg += 1
         payload = base64.decodestring(request['payload'])
-        pl = self.sec.decrypt_with_symmetric(bytes(payload), sender.sa_data)
+        try:
+            pl = self.sec.decrypt_with_symmetric(bytes(payload), sender.sa_data)
+        except InvalidToken:
+            logging.warning("Invalid key or integrity check fail from client %s" % sender)
+            return
         plj = json.loads(pl)
 
         if not 'type' in plj.keys():

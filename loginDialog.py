@@ -26,7 +26,7 @@ class Ui_Dialog(object):
     def setupUi(self, Dialog):
         Dialog.setObjectName(_fromUtf8("Dialog"))
         Dialog.setWindowModality(QtCore.Qt.ApplicationModal)
-        Dialog.resize(363, 211)
+        Dialog.resize(351, 193)
         Dialog.setSizeGripEnabled(False)
         Dialog.setModal(True)
         self.verticalLayout_4 = QtGui.QVBoxLayout(Dialog)
@@ -121,6 +121,15 @@ class Ui_Dialog(object):
         self.pushButton.setObjectName(_fromUtf8("pushButton"))
         self.horizontalLayout.addWidget(self.pushButton)
         self.verticalLayout_3.addLayout(self.horizontalLayout)
+        self.radioButton = QtGui.QRadioButton(self.splitter)
+        self.radioButton.setChecked(True)
+        self.radioButton.setObjectName(_fromUtf8("radioButton"))
+        self.buttonGroup = QtGui.QButtonGroup(Dialog)
+        self.buttonGroup.setObjectName(_fromUtf8("buttonGroup"))
+        self.buttonGroup.addButton(self.radioButton)
+        self.radioButton_2 = QtGui.QRadioButton(self.splitter)
+        self.radioButton_2.setObjectName(_fromUtf8("radioButton_2"))
+        self.buttonGroup.addButton(self.radioButton_2)
         self.verticalLayout_4.addWidget(self.splitter)
 
         self.retranslateUi(Dialog)
@@ -132,4 +141,6 @@ class Ui_Dialog(object):
         self.label_3.setText(_translate("Dialog", "Port", None))
         self.label_2.setText(_translate("Dialog", "Name", None))
         self.pushButton.setText(_translate("Dialog", "Connect", None))
+        self.radioButton.setText(_translate("Dialog", "RSA_WITH_AES_128_CBC_SHA256", None))
+        self.radioButton_2.setText(_translate("Dialog", "ECDHE_WITH_AES_128_CBC_SHA256", None))
 

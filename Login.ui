@@ -9,8 +9,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>363</width>
-    <height>211</height>
+    <width>351</width>
+    <height>193</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -214,6 +214,25 @@
        </item>
       </layout>
      </widget>
+     <widget class="QRadioButton" name="radioButton">
+      <property name="text">
+       <string>RSA_WITH_AES_128_CBC_SHA256</string>
+      </property>
+      <property name="checked">
+       <bool>true</bool>
+      </property>
+      <attribute name="buttonGroup">
+       <string notr="true">buttonGroup</string>
+      </attribute>
+     </widget>
+     <widget class="QRadioButton" name="radioButton_2">
+      <property name="text">
+       <string>ECDHE_WITH_AES_128_CBC_SHA256</string>
+      </property>
+      <attribute name="buttonGroup">
+       <string notr="true">buttonGroup</string>
+      </attribute>
+     </widget>
     </widget>
    </item>
   </layout>
@@ -223,4 +242,7 @@
  <slots>
   <slot>connectPressed()</slot>
  </slots>
+ <buttongroups>
+  <buttongroup name="buttonGroup"/>
+ </buttongroups>
 </ui>

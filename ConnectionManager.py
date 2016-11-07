@@ -7,7 +7,7 @@ from User import User
 from PyQt4 import QtCore
 from security import *
 import base64
-from cryptography.fernet import  InvalidToken
+from cryptography.fernet import InvalidToken
 import json
 BUFSIZE = 512 * 1024
 TERMINATOR = "\n\n"
@@ -81,9 +81,20 @@ class ConnectionManager(QtCore.QThread):
                 pass
                 # error??
 
-    def s_connect(self):
+    def s_connect(self, cipher_suite=1):
+        # cipher_suite
+        # if 1: "RSA_WITH_AES_128_CBC_SHA256"
+        # if 2: "ECDHE_WITH_AES_128_CBC_SHA256"
         self.user.id = time.time()
-        msg = self.form_json_connect(1, self.user.name, self.user.id, [SUPPORTED_CIPHER_SUITES[1], SUPPORTED_CIPHER_SUITES[0]], "")
+        if cipher_suite == 1:
+            msg = self.form_json_connect(1, self.user.name, self.user.id,
+                                         [SUPPORTED_CIPHER_SUITES[0], SUPPORTED_CIPHER_SUITES[1], SUPPORTED_CIPHER_SUITES[2]], "")
+        elif cipher_suite == 2:
+            msg = self.form_json_connect(1, self.user.name, self.user.id,
+                                         [SUPPORTED_CIPHER_SUITES[1], SUPPORTED_CIPHER_SUITES[0], SUPPORTED_CIPHER_SUITES[2]], "")
+        else:
+            # shouldnt happen
+            return
         self.send_message(msg)
         self.user.connection_state += 1
         self.connecting_event.clear()

@@ -58,7 +58,11 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
                 self.connect(self.comm, self.comm.list_signal, self.list_users)
                 self.connect(self.comm, self.comm.error_signal, self.show_error)
                 self.connect(self.comm, self.comm.change_list, self.change_listitem)
-                if self.comm.s_connect():
+                if self.diag_ui.radioButton.isChecked():
+                    cipher_suite = 1
+                else:
+                    cipher_suite = 2
+                if self.comm.s_connect(cipher_suite=cipher_suite):
                     QtGui.QApplication.restoreOverrideCursor()
                     return self.login_dialog.accept()
                 self.show_error("ERRO a ligar ao servidor")
