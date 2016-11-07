@@ -24,7 +24,7 @@ class security:
 
     def ecdh_gen_key_pair(self):
         private_key = ec.generate_private_key(ec.SECP384R1(), default_backend())
-        peer_public_key = ec.generate_private_key(ec.SECP384R1(), default_backend()).public_key()
+        peer_public_key = private_key.public_key()
         return (private_key, peer_public_key)
 
     def ecdh_get_shared_secret(self, private_key, partner_public_key):
