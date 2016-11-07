@@ -37,6 +37,7 @@ class Client:
         self.bufout = ""
         self.addr = addr
         self.id = None
+        self.num_msg = 0
         self.sa_data = None
         self.level = 0
         self.state = STATE_NONE
@@ -270,7 +271,6 @@ class Server:
 
             if req['type'] == 'ack':
                 return  # TODO: Ignore for now
-
             client.send({'type': 'ack'})
 
             if req['type'] == 'connect':
@@ -305,9 +305,8 @@ class Server:
             logging.warning("Connect message with missing fields")
             return
 
-        if sender.level == 0:
+        if sender.level == 0 and request['phase'] == 1:
             print "LEVEL 0 \n\n"
-            # TODO: change choice
             if request['ciphers'][0] in SUPPORTED_CIPHER_SUITES:
                 sender.cipher_suite = request['ciphers'][0]
             else:
@@ -319,44 +318,66 @@ class Server:
             sender.name = request['name']
             sender.level = 1
             return
-        elif sender.level == 1:
+        elif sender.level == 1 and request['phase'] == 3:
             print "LEVEL 1 \n\n"
             if "data" not in request.keys():
                 logging.warning("Missing fields")
                 return
             if request['data'] == 'ok b0ss':
-                # TODO: check cipher suite to use
-                # TODO: check name?
-                priv_key, pub_key = self.sec.rsa_gen_key_pair()
-                sender.sa_data = priv_key
-                priv_key = ""
-                msg = {'type': 'connect', 'phase': request['phase'] + 1, 'id': time.time(),
+                if sender.cipher_suite == SUPPORTED_CIPHER_SUITES[0]:
+                    priv_key, pub_key = self.sec.rsa_gen_key_pair()
+                    sender.sa_data = priv_key
+                    del priv_key
+                    msg = {'type': 'connect', 'phase': request['phase'] + 1, 'id': time.time(),
                        'ciphers': sender.cipher_suite, 'data': base64.encodestring(self.sec.rsa_public_key_to_pem(pub_key))}
-                sender.send(msg)
-                sender.level = 2
+                    sender.send(msg)
+                    sender.level = 2
+                    return
+                elif sender.cipher_suite == SUPPORTED_CIPHER_SUITES[1]:
+                    priv_key, peer_key = self.sec.ecdh_gen_key_pair()
+                    sender.sa_data = priv_key
+                    del priv_key
+                    msg = {'type': 'connect', 'phase': request['phase'] + 1, 'id': time.time(),
+                           'ciphers': sender.cipher_suite,
+                           'data': base64.encodestring(self.sec.rsa_public_key_to_pem(peer_key))}
+                    sender.send(msg)
+                    sender.level = 2
+                    return
             elif request['data'] == 'not supported':
                 logging.warning("Connect message with missing fields")
+                self.delClient(sender.socket)
+                return
 
-        elif sender.level == 2:
+        elif sender.level == 2 and request['phase'] == 5:
             print "LEVEL 2 \n\n"
             if 'data' not in request.keys():
                 logging.warning("Missing fields")
                 return
-            # TODO: check cipher suite to use
-            session_key = self.sec.rsa_decrypt_with_private_key(base64.decodestring(request['data']), sender.sa_data)
-            sender.sa_data = session_key
-            session_key = ""
-            # TODO: cipher last message and make a sha2 of it and send as confirmation
-            to_send = self.sec.encrypt_with_symmetric(self.sec.get_hash(bytes(str(request['id']) + request['data'])), sender.sa_data)
-            to_send = base64.encodestring(to_send)
-            msg = {'type': 'connect', 'phase': request['phase'] + 1, 'id': time.time(),
+            if sender.cipher_suite == SUPPORTED_CIPHER_SUITES[0]:
+                session_key = self.sec.rsa_decrypt_with_private_key(base64.decodestring(request['data']), sender.sa_data)
+                sender.sa_data = session_key
+                del session_key
+                to_send = self.sec.encrypt_with_symmetric(self.sec.get_hash(bytes(str(request['id']) + request['data'])), sender.sa_data)
+                to_send = base64.encodestring(to_send)
+                msg = {'type': 'connect', 'phase': request['phase'] + 1, 'id': time.time(),
                        'ciphers': sender.cipher_suite, 'data': to_send}
-            sender.send(msg)
-            sender.level = 200
-            sender.setState(STATE_CONNECTED)
-
-        self.broadcast_new_list(sender)
-        logging.info("Client %s Connected" % request['id'])
+                sender.send(msg)
+                sender.level = 200
+                sender.setState(STATE_CONNECTED)
+                self.broadcast_new_list(sender)
+                logging.info("Client %s Connected" % request['id'])
+            elif sender.cipher_suite == SUPPORTED_CIPHER_SUITES[1]:
+                peer_key = self.sec.rsa_public_pem_to_key(base64.decodestring(request['data']))
+                session_key = self.sec.ecdh_get_shared_secret(sender.sa_data, peer_key)
+                sender.sa_data = session_key
+                del session_key
+                msg = {'type': 'connect', 'phase': request['phase'] + 1, 'id': time.time(),
+                       'ciphers': sender.cipher_suite, 'data': "ok ecdh done"}
+                sender.send(msg)
+                sender.level = 200
+                sender.setState(STATE_CONNECTED)
+                self.broadcast_new_list(sender)
+                logging.info("Client %s Connected" % request['id'])
 
     def processList(self, sender, request):
         """
@@ -391,7 +412,7 @@ class Server:
             return
 
         # This is a secure message.
-        # TODO: Inner message is encrypted for us. Must decrypt and validate.
+        sender.num_msg += 1
         payload = base64.decodestring(request['payload'])
         pl = self.sec.decrypt_with_symmetric(bytes(payload), sender.sa_data)
         plj = json.loads(pl)

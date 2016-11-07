@@ -2,6 +2,7 @@ import os
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.concatkdf import ConcatKDFHash
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.fernet import Fernet
 from cryptography.hazmat.backends import default_backend
@@ -28,7 +29,13 @@ class security:
 
     def ecdh_get_shared_secret(self, private_key, partner_public_key):
         shared_key = private_key.exchange(ec.ECDH(), partner_public_key)
-        return shared_key
+        shared_key = ConcatKDFHash(
+            algorithm=hashes.SHA256(),
+            length=32,
+            otherinfo=None,
+            backend=default_backend()
+        ).derive(shared_key)
+        return base64.urlsafe_b64encode(shared_key)
 
     def rsa_private_pem_to_key(self, pem):
         private_key = serialization.load_pem_private_key(

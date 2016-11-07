@@ -58,9 +58,11 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
                 self.connect(self.comm, self.comm.list_signal, self.list_users)
                 self.connect(self.comm, self.comm.error_signal, self.show_error)
                 self.connect(self.comm, self.comm.change_list, self.change_listitem)
-                self.comm.s_connect()
-                QtGui.QApplication.restoreOverrideCursor()
-                return self.login_dialog.accept()
+                if self.comm.s_connect():
+                    QtGui.QApplication.restoreOverrideCursor()
+                    return self.login_dialog.accept()
+                self.show_error("ERRO a ligar ao servidor")
+                return self.login_dialog.reject()
         else:
             QtGui.QApplication.restoreOverrideCursor()
             return

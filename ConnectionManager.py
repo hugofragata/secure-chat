@@ -7,6 +7,7 @@ from User import User
 from PyQt4 import QtCore
 from security import *
 import base64
+from cryptography.fernet import  InvalidToken
 import json
 BUFSIZE = 512 * 1024
 TERMINATOR = "\n\n"
@@ -82,7 +83,7 @@ class ConnectionManager(QtCore.QThread):
 
     def s_connect(self):
         self.user.id = time.time()
-        msg = self.form_json_connect(1, self.user.name, self.user.id, SUPPORTED_CIPHER_SUITES, "")
+        msg = self.form_json_connect(1, self.user.name, self.user.id, [SUPPORTED_CIPHER_SUITES[1], SUPPORTED_CIPHER_SUITES[0]], "")
         self.send_message(msg)
         self.user.connection_state += 1
         self.connecting_event.clear()
@@ -118,7 +119,6 @@ class ConnectionManager(QtCore.QThread):
                     print r
                 except:
                     return
-
                 if not isinstance(r, dict):
                     return
                 if 'type' not in r:
@@ -142,11 +142,12 @@ class ConnectionManager(QtCore.QThread):
             if self.user.connection_state != 2:
                 return
             if req['ciphers'] not in SUPPORTED_CIPHER_SUITES:
+                print "ERROR connecting to server"
                 msg = {'type': 'connect', 'phase': req['phase'] + 1, 'name': self.user.name, 'id': time.time(),
                        'ciphers': req['ciphers'], 'data': 'not supported'}
                 self.send_message(json.dumps(msg))
-                raise ConnectionManagerError
-            # TODO: check certificate of server
+                self.user.connection_state = 1
+                return
             self.cipher_suite = req['ciphers']
             msg = {'type': 'connect', 'phase': req['phase'] + 1, 'name': self.user.name, 'id': time.time(),
                    'ciphers': self.cipher_suite, 'data': 'ok b0ss'}
@@ -160,9 +161,8 @@ class ConnectionManager(QtCore.QThread):
                 if len(req['data']) == 0:
                     return
                 server_pubkey = self.sec.rsa_public_pem_to_key(base64.decodestring(req['data']))
-                sym_key = self.sec.generate_key_symmetric()
-                self.sym_key = sym_key #b-b-but that's lewd, s-senpai :3
-                to_send = self.sec.rsa_encrypt_with_public_key(sym_key, server_pubkey)
+                self.sym_key = self.sec.generate_key_symmetric()
+                to_send = self.sec.rsa_encrypt_with_public_key(self.sym_key, server_pubkey)
                 to_send = base64.encodestring(to_send)
                 msg = {'type': 'connect', 'phase': req['phase'] + 1, 'name': self.user.name, 'id': time.time(),
                        'ciphers': self.cipher_suite, 'data': to_send}
@@ -170,8 +170,15 @@ class ConnectionManager(QtCore.QThread):
                 self.user.connection_state += 1
                 self.connect_check = self.sec.get_hash(bytes(str(msg['id']) + msg['data']))
             elif self.cipher_suite == SUPPORTED_CIPHER_SUITES[1]:
-                # TODO: DH
-                pass
+                priv_key, pub_key = self.sec.ecdh_gen_key_pair()
+                msg = {'type': 'connect', 'phase': req['phase'] + 1, 'name': self.user.name, 'id': time.time(),
+                       'ciphers': self.cipher_suite,
+                       'data': base64.encodestring(self.sec.rsa_public_key_to_pem(pub_key))}
+                peer_key = self.sec.rsa_public_pem_to_key(base64.decodestring(req['data']))
+                self.sym_key = self.sec.ecdh_get_shared_secret(priv_key, peer_key)
+                del priv_key
+                self.send_message(json.dumps(msg))
+                self.user.connection_state += 1
 
         if req['phase'] == 6:
             if self.user.connection_state != 4:
@@ -181,19 +188,26 @@ class ConnectionManager(QtCore.QThread):
             if self.cipher_suite == SUPPORTED_CIPHER_SUITES[0]:
                 check = self.sec.decrypt_with_symmetric(base64.decodestring(req['data']), self.sym_key)
                 if check != self.connect_check:
-                    raise ConnectionManagerError
+                    return
                 self.user.connection_state = 200
                 self.connect_check = ""
                 self.connecting_event.set()
                 # Connected!
             elif self.cipher_suite == SUPPORTED_CIPHER_SUITES[1]:
-                # TODO: DH
-                pass
+                if req['data'] == "ok ecdh done":
+                    self.user.connection_state = 200
+                    self.connecting_event.set()
+                else:
+                    return
 
     def process_secure(self, req):
         if self.user.connection_state != 200:
             return
-        pl = self.sec.decrypt_with_symmetric(base64.decodestring(req['payload']), self.sym_key)
+        try:
+            pl = self.sec.decrypt_with_symmetric(base64.decodestring(req['payload']), self.sym_key)
+        except InvalidToken:
+            print "decrypting error\n\n"
+            return
         plj = json.loads(pl)
 
         if plj['type'] == 'list':
@@ -227,16 +241,30 @@ class ConnectionManager(QtCore.QThread):
                 if self.peers[payload_j['src']].connection_state == 200:
                     ciphered_data = payload_j['data']
                     peer_sym_key = self.peers[payload_j['src']].sa_data
-                    deciphered_data = self.sec.decrypt_with_symmetric(base64.decodestring(ciphered_data), peer_sym_key)
+                    try:
+                        deciphered_data = self.sec.decrypt_with_symmetric(base64.decodestring(ciphered_data), peer_sym_key)
+                    except InvalidToken:
+                        self.emit(self.error_signal, "Invalid signature in " + self.peers[payload_j['src']].name +" msg!")
+                        return
                     self.peers[payload_j['src']].buffin += deciphered_data + "\n\n"
                     self.emit(self.change_list, payload_j['src'])
                     return
+        if self.peer_connected is None:
+            return
         if self.peers[self.peer_connected].connection_state != 200:
-            #TODO disconnect peer?
+            # should never happen
+            if self.peer_connected in self.peers.keys():
+                del self.peers[self.peer_connected]
+                self.send_client_disconnect(self.peer_connected)
+                self.peer_connected = None
             return
         ciphered_data = payload_j['data']
         peer_sym_key = self.peers[self.peer_connected].sa_data
-        deciphered_data = self.sec.decrypt_with_symmetric(base64.decodestring(ciphered_data), peer_sym_key)
+        try:
+            deciphered_data = self.sec.decrypt_with_symmetric(base64.decodestring(ciphered_data), peer_sym_key)
+        except InvalidToken:
+            self.emit(self.error_signal, "Invalid signature in peer msg!")
+            return
         print "recebi"
         self.emit(self.signal, deciphered_data)
         return
@@ -245,7 +273,7 @@ class ConnectionManager(QtCore.QThread):
         pass
 
     def send_client_comm(self, text):
-        if self.peer_connected == None:
+        if self.peer_connected is None:
             return
         if self.peers[self.peer_connected].connection_state != 200:
             return
