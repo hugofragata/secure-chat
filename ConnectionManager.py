@@ -127,7 +127,6 @@ class ConnectionManager(QtCore.QThread):
                 print "HANDLING message from server: %r", repr(req)
                 try:
                     r = json.loads(req)
-                    print r
                 except:
                     return
                 if not isinstance(r, dict):
@@ -241,7 +240,6 @@ class ConnectionManager(QtCore.QThread):
 
     def send_ack_peer(self, comm_data):
         hashed_data = base64.encodestring(self.sec.get_hash(base64.decodestring(comm_data)))
-        print "aqui"
         dst_id = self.peer_connected
         msg_to_peer = json.dumps({'type': 'ack', 'src': self.user.id, 'dst': dst_id, 'data': hashed_data})
 
@@ -282,7 +280,6 @@ class ConnectionManager(QtCore.QThread):
         except InvalidToken:
             self.emit(self.error_signal, "Invalid signature in peer msg!")
             return
-        print "recebi"
         self.emit(self.signal, deciphered_data)
         return
 
@@ -294,7 +291,6 @@ class ConnectionManager(QtCore.QThread):
             return
         if self.peers[self.peer_connected].connection_state != 200:
             return
-        print "enviou"
         dst_sym_key = self.peers[self.peer_connected].sa_data
         dst_id = self.peer_connected
         ciphered_data_to_client = base64.encodestring(self.sec.encrypt_with_symmetric(text, dst_sym_key))
