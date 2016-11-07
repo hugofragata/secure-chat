@@ -170,15 +170,21 @@ class ConnectionManager(QtCore.QThread):
             if self.cipher_suite == SUPPORTED_CIPHER_SUITES[0]:
                 if len(req['data']) == 0:
                     return
+
+                print "\n\n ****phase 4 tcheugei \n\n"
                 server_pubkey = self.sec.rsa_public_pem_to_key(base64.decodestring(req['data']))
+
+                print "\n\n ****phase 4 pem to public consegui crl \n\n"
                 self.sym_key = self.sec.generate_key_symmetric()
                 to_send = self.sec.rsa_encrypt_with_public_key(self.sym_key, server_pubkey)
+                print "\n\n ****phase 4 encprypt public \n\n"
                 to_send = base64.encodestring(to_send)
                 msg = {'type': 'connect', 'phase': req['phase'] + 1, 'name': self.user.name, 'id': time.time(),
                        'ciphers': self.cipher_suite, 'data': to_send}
                 self.send_message(json.dumps(msg))
                 self.user.connection_state += 1
                 self.connect_check = self.sec.get_hash(bytes(str(msg['id']) + msg['data']))
+                print "\n\n ****phase 4 HASH MSG \n\n"
             elif self.cipher_suite == SUPPORTED_CIPHER_SUITES[1]:
                 priv_key, pub_key = self.sec.ecdh_gen_key_pair()
                 msg = {'type': 'connect', 'phase': req['phase'] + 1, 'name': self.user.name, 'id': time.time(),

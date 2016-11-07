@@ -154,7 +154,7 @@ class security:
 
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
-            length=32,
+            length=128,
             salt=salt,
             iterations=100000,
             backend=default_backend())
@@ -174,7 +174,7 @@ class security:
     def get_hmac_client_com(self, src, dst, ciphered_data, peer_sym_key):
         """
 
-        :param src:
+        :param src: id
         :param dst:
         :param ciphered_data:
         :param peer_sym_key:
