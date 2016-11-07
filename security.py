@@ -154,7 +154,7 @@ class security:
 
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
-            length=32,
+            length=128,
             salt=salt,
             iterations=100000,
             backend=default_backend())
