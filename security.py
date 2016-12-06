@@ -175,7 +175,7 @@ class security:
         """
 
         :param src: id
-        :param dst:
+        :param dst:peer_id
         :param ciphered_data:
         :param peer_sym_key:
         :return: Produces a HMAC according to RFC 2104 for 'client-com' type requests
