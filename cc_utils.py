@@ -35,3 +35,4 @@ def get_info(cert_pem):
     subj = cert.get_subject()
     return subj.get_components()
 
+#TODO: create cert from server's static key_pair

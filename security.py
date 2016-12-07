@@ -205,6 +205,7 @@ class security:
 
 
 #TODO: digital signature with rsa (ekpriv(hash(msg)))
+#TODO: implement key_pair rotation
 
 class security_error:
     pass
