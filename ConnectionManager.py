@@ -30,21 +30,27 @@ class ConnectionManager(QtCore.QThread):
         :param user: all info about this user
         :type user: User
         """
+        # User stuff
         self.user = user
         self.user.sa_data = None
         self.user.cipher_suite = ""
+        # TODO: change connect_state to a enum? CONNECTED, etc
         self.connect_check = None
+        # threading events
         self.connecting_event = threading.Event()
         self.event = threading.Event()
         self.event.set()
+
         self.running = True
         self.sec = security()
         self.out_buffer = ""
         self.in_buffer = ""
-        # TODO: change connect_state to a enum? CONNECTED, etc
+
+        #peers
         # Dic with id:User
         self.peers = {}
         self.peer_connected = None #id of connect peer client
+        # QT signals
         QtCore.QThread.__init__(self, parent=gui)
         self.signal = QtCore.SIGNAL("newMsg")
         self.list_signal = QtCore.SIGNAL("userList")
@@ -122,10 +128,13 @@ class ConnectionManager(QtCore.QThread):
             return
         msg = {'type':'disconnect', 'name':self.user.name, 'src':self.user.id}
         msgs = json.dumps(msg)
+        self.user.connection_state = 1
+        del self.peers
+        self.peers = {}
+        self.peer_connected = None
         self.send_message(msgs)
 
     def send_message(self, text):
-        # to_send = self.fern.encrypt(bytes(base64.encodestring(text)))
         self.event.wait()
         self.event.clear()
         self.out_buffer += text + "\n\n"
@@ -258,20 +267,25 @@ class ConnectionManager(QtCore.QThread):
 
     def process_client_com(self, payload_j):
         if not self.user.connection_state == 200:
+            # user is not connected so ignore this message
             return
         if self.peer_connected != payload_j['src']:
-            if payload_j['src'] in self.peers.keys():
-                if self.peers[payload_j['src']].connection_state == 200:
-                    ciphered_data = payload_j['data']
-                    peer_sym_key = self.peers[payload_j['src']].sa_data
-                    try:
-                        deciphered_data = self.sec.decrypt_with_symmetric(base64.decodestring(ciphered_data), peer_sym_key)
-                    except InvalidToken:
-                        self.emit(self.error_signal, "Invalid signature in " + self.peers[payload_j['src']].name + " msg!")
-                        return
-                    self.peers[payload_j['src']].buffin += deciphered_data + "\n\n"
-                    self.emit(self.change_list, payload_j['src'])
-                    return
+            if payload_j['src'] not in self.peers.keys():
+                # no info on this peer
+                return
+            if self.peers[payload_j['src']].connection_state != 200:
+                # i am not connected to this peer
+                return
+            ciphered_data = payload_j['data']
+            peer_sym_key = self.peers[payload_j['src']].sa_data
+            try:
+                deciphered_data = self.sec.decrypt_with_symmetric(base64.decodestring(ciphered_data), peer_sym_key)
+            except InvalidToken:
+                self.emit(self.error_signal, "Invalid signature in " + self.peers[payload_j['src']].name + " msg!")
+                return
+            self.peers[payload_j['src']].buffin += deciphered_data + "\n\n"
+            self.emit(self.change_list, payload_j['src'])
+            return
         if self.peer_connected is None:
             return
         if self.peers[self.peer_connected].connection_state != 200:
@@ -311,9 +325,14 @@ class ConnectionManager(QtCore.QThread):
 
     def process_client_connect(self, ccj):
         if self.user.connection_state != 200:
+            # i am not connected to the server
             return
         if not all(k in ccj.keys() for k in ("src", "dst", "phase", "id", "ciphers")):
             return
+        if ccj['src'] in self.peers.keys():
+            if self.peers[ccj['src']].connection_state == 200:
+                print "already connected"
+                return
         if self.peer_connected == ccj['src']:
             print "already connected"
             return
