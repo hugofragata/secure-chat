@@ -9,6 +9,8 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import ec
 import base64
 
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+
 path_to_key = "./key.pem"
 SUPPORTED_CIPHER_SUITES = ["RSA_WITH_AES_128_CBC_SHA256", "ECDHE_WITH_AES_128_CBC_SHA256", "NONE"]
 
@@ -202,6 +204,7 @@ class security:
         return  hmac_value == h2
 
 
+#TODO: digital signature with rsa (ekpriv(hash(msg)))
 
 class security_error:
     pass
