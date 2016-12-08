@@ -2,7 +2,7 @@ from OpenSSL import crypto
 
 ROOT_CERT = open('./baltimore_root.cer', 'r').read()
 BUNDLE_CERTS = open('./cc_bundle_tree.cer', 'r').read()
-CRL_CERTS = open('./cc_bundle_tree.cer', 'r').read()
+CRL_CERTS = ''#open('./cc_bundle_tree.cer', 'r').read()
 
 def verify_certificate(cert_pem):
     '''
@@ -34,5 +34,6 @@ def get_info(cert_pem):
     cert = crypto.load_certificate(crypto.FILETYPE_PEM, cert_pem)
     subj = cert.get_subject()
     return subj.get_components()
+
 
 #TODO: create cert from server's static key_pair
