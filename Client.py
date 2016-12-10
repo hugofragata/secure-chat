@@ -13,21 +13,31 @@ except AttributeError:
 
 
 class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, ccutils=None):
         super(AppChat, self).__init__(parent)
+        self.ccutils = ccutils
         self.comm = None
         self.setupUi(self)
         self.login_dialog = QtGui.QDialog()
         self.diag_ui = Ui_Dialog()
         self.diag_ui.setupUi(self.login_dialog)
         self.diag_ui.pushButton.clicked.connect(self.login)
+        self.diag_ui.cartaoAuth.clicked.connect(self.ccChoose)
         self.sendButton.clicked.connect(self.sendMsg)
         self.listWidget.itemDoubleClicked.connect(self.connect_to_user)
         self.msgBox.installEventFilter(self)
         self.actionRSA_WITH_AES_128.triggered.connect(self.change_client_clientRSA)
         self.actionECDHE_WITH_AES_128.triggered.connect(self.change_client_clientDH)
+
+        self.cipher_suite = None
+        if ccutils is None:
+            self.diag_ui.cartaoAuth.setDisabled(True)
+
         accept = self.login_dialog.exec_()
         if accept == 0:
+            quit()
+        if not self.comm.s_connect(cipher_suite=self.cipher_suite):
+            self.show_error("ERRO a ligar ao servidor")
             quit()
         self.comm.get_user_lists()
 
@@ -36,42 +46,36 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
         address = str(self.diag_ui.address.text())
         port = str(self.diag_ui.port.text())
         username = str(self.diag_ui.userName.text())
-        if address and port and username:
-            if not ConnectionManager.is_ip_address(address):
-                QtGui.QApplication.restoreOverrideCursor()
-                return
-            if not self.valid_port(port):
-                QtGui.QApplication.restoreOverrideCursor()
-                return
-            user = User(username)
-            try:
-                self.comm = ConnectionManager(address, port, self, user)
-            except ConnectionManagerError:
-                QtGui.QApplication.restoreOverrideCursor()
-                errorDiag = QtGui.QMessageBox()
-                errorDiag.setIcon(QtGui.QMessageBox.Critical)
-                errorDiag.setText("Connection ERROR")
-                errorDiag.setWindowTitle("Error")
-                errorDiag.setStandardButtons(QtGui.QMessageBox.Ok)
-                errorDiag.exec_()
-                return
-            else:
-                self.connect(self.comm, self.comm.signal, self.updateChat)
-                self.connect(self.comm, self.comm.list_signal, self.list_users)
-                self.connect(self.comm, self.comm.error_signal, self.show_error)
-                self.connect(self.comm, self.comm.change_list, self.change_listitem)
-                if self.diag_ui.radioButton.isChecked():
-                    cipher_suite = 1
-                else:
-                    cipher_suite = 2
-                if self.comm.s_connect(cipher_suite=cipher_suite):
-                    QtGui.QApplication.restoreOverrideCursor()
-                    return self.login_dialog.accept()
-                self.show_error("ERRO a ligar ao servidor")
-                return self.login_dialog.reject()
-        else:
+        if not self.diag_ui.cartaoAuth.isChecked() and not username:
             QtGui.QApplication.restoreOverrideCursor()
             return
+        if not address or not port:
+            QtGui.QApplication.restoreOverrideCursor()
+            return
+        if not ConnectionManager.is_ip_address(address) or not self.valid_port(port):
+            QtGui.QApplication.restoreOverrideCursor()
+            return
+        if self.diag_ui.cartaoAuth.isChecked():
+            user = User(ccutils=self.ccutils)
+        else:
+            user = User(username)
+        try:
+            self.comm = ConnectionManager(address, port, self, user)
+        except ConnectionManagerError:
+            QtGui.QApplication.restoreOverrideCursor()
+            self.show_error("Connection ERROR")
+            return
+        else:
+            self.connect(self.comm, self.comm.signal, self.updateChat)
+            self.connect(self.comm, self.comm.list_signal, self.list_users)
+            self.connect(self.comm, self.comm.error_signal, self.show_error)
+            self.connect(self.comm, self.comm.change_list, self.change_listitem)
+            if self.diag_ui.radioButton.isChecked():
+                self.cipher_suite = 1
+            else:
+                self.cipher_suite = 2
+            QtGui.QApplication.restoreOverrideCursor()
+            return self.login_dialog.accept()
 
     def change_client_clientRSA(self):
         if self.actionECDHE_WITH_AES_128.isChecked():
@@ -96,6 +100,12 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
                 continue
             item = UserListItem(user['name'], user['id'])
             self.listWidget.addItem(item)
+
+    def ccChoose(self):
+        if self.diag_ui.cartaoAuth.isChecked():
+            self.diag_ui.userName.setDisabled(True)
+        else:
+            self.diag_ui.userName.setDisabled(False)
 
     def change_listitem(self, uid):
         for i in xrange(self.listWidget.count()):
@@ -155,9 +165,9 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
             return False
 
 
-def main():
+def main(ccUtils=None):
     app = QtGui.QApplication(sys.argv)
-    form = AppChat()
+    form = AppChat(ccutils=ccUtils)
     form.show()
     app.exec_()
 

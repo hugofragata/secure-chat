@@ -130,6 +130,8 @@ class Ui_Dialog(object):
         self.radioButton_2 = QtGui.QRadioButton(self.splitter)
         self.radioButton_2.setObjectName(_fromUtf8("radioButton_2"))
         self.buttonGroup.addButton(self.radioButton_2)
+        self.cartaoAuth = QtGui.QCheckBox(self.splitter)
+        self.cartaoAuth.setObjectName(_fromUtf8("cartaoAuth"))
         self.verticalLayout_4.addWidget(self.splitter)
 
         self.retranslateUi(Dialog)
@@ -143,4 +145,5 @@ class Ui_Dialog(object):
         self.pushButton.setText(_translate("Dialog", "Connect", None))
         self.radioButton.setText(_translate("Dialog", "RSA_WITH_AES_128_CBC_SHA256", None))
         self.radioButton_2.setText(_translate("Dialog", "ECDHE_WITH_AES_128_CBC_SHA256", None))
+        self.cartaoAuth.setText(_translate("Dialog", "Autenticar com CC", None))
 

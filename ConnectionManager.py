@@ -105,7 +105,8 @@ class ConnectionManager(QtCore.QThread):
         # cipher_suite
         # if 1: "RSA_WITH_AES_128_CBC_SHA256"
         # if 2: "ECDHE_WITH_AES_128_CBC_SHA256"
-        self.user.id = time.time()
+        #if not self.user.ccauth:
+        #    self.user.id = time.time()
         if cipher_suite == 1:
             msg = self.form_json_connect(1, self.user.name, self.user.id,
                                          [SUPPORTED_CIPHER_SUITES[0], SUPPORTED_CIPHER_SUITES[1], SUPPORTED_CIPHER_SUITES[2]], "")

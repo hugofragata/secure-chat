@@ -233,6 +233,11 @@
        <string notr="true">buttonGroup</string>
       </attribute>
      </widget>
+     <widget class="QCheckBox" name="cartaoAuth">
+      <property name="text">
+       <string>Autenticar com CC</string>
+      </property>
+     </widget>
     </widget>
    </item>
   </layout>
