@@ -36,6 +36,7 @@ class ConnectionManager(QtCore.QThread):
         self.user.cipher_suite = ""
         # TODO: change connect_state to a enum? CONNECTED, etc
         self.connect_check = None
+        self.server_pubkey = None
         # threading events
         self.connecting_event = threading.Event()
         self.event = threading.Event()
@@ -175,7 +176,17 @@ class ConnectionManager(QtCore.QThread):
         if req['phase'] == 2:
             if self.user.connection_state != 2:
                 return
-            # TODO: verify server certificate
+            if len(req['data']) <= 0:
+                print "ERROR connecting to server: NO CERTIFICATE"
+                return
+
+            cert = base64.decodestring(req['data'])
+            if not self.sec.verify_self_signed_cert(cert):
+                print "ERROR connecting to server: INVALID CERTIFICATE"
+                return
+            print "CERTIFICATE VALID\n\n\n\n\n\n"
+            self.server_pubkey = self.sec.get_pubkey_from_cert(cert)
+
             if req['ciphers'] not in SUPPORTED_CIPHER_SUITES:
                 print "ERROR connecting to server"
                 msg = {'type': 'connect', 'phase': req['phase'] + 1, 'name': self.user.name, 'id': time.time(),

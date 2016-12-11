@@ -1,4 +1,5 @@
 import os
+from OpenSSL import crypto
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives import hashes
@@ -124,7 +125,31 @@ class security:
                                             label=None))
         return plain_text
 
+    def verify_self_signed_cert(self, cert):
+        '''
+        Verifies whether a provided certificate is valid
+        :param cert: The to-be validated certificate in PEM format
+        :return: True or False
+        '''
+        certificate = crypto.load_certificate(crypto.FILETYPE_PEM, cert)
+        store = crypto.X509Store()
+        store.add_cert(certificate)
+        try:
+            crypto.X509StoreContext(store, certificate).verify_certificate()
+        except crypto.X509StoreContextError:
+            return False
+        else:
+            return True
 
+    def get_pubkey_from_cert(self, cert):
+        '''
+        Returns the public key from a certificate
+        :param cert: certificate in PEM format
+        :return: the public key
+        '''
+        certificate = crypto.load_certificate(crypto.FILETYPE_PEM, cert)
+        pem = crypto.dump_publickey(crypto.FILETYPE_PEM, certificate.get_pubkey())
+        return self.rsa_public_pem_to_key(pem)
 
 ################
 # Symmetric cryptography functions
@@ -204,7 +229,6 @@ class security:
         return  hmac_value == h2
 
 
-#TODO: digital signature with rsa (ekpriv(hash(msg)))
 #TODO: implement key_pair rotation
 
 class security_error:

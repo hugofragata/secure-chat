@@ -56,4 +56,14 @@ class Ccutils:
         cer_bytes = objs[0].to_dict()["CKA_VALUE"]
         cer = ''.join(chr(c) for c in cer_bytes)
         return crypto.load_certificate(crypto.FILETYPE_ASN1, cer)
+
+    def sign_data(self, data):
+        key = self.session.findObjects(template=((PyKCS11.CKA_LABEL, "CITIZEN AUTHENTICATION KEY"),
+                                            (PyKCS11.CKA_CLASS, PyKCS11.CKO_PRIVATE_KEY),
+                                            (PyKCS11.CKA_KEY_TYPE, PyKCS11.CKK_RSA)))[0]
+        print key
+        mec = PyKCS11.Mechanism(PyKCS11.CKM_SHA1_RSA_PKCS, "")
+        result = self.session.sign(key, data, mec)
+        return ''.join(chr(c) for c in result)
+
 #TODO: create cert from server's static key_pair

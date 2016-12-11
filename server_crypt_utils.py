@@ -3,6 +3,9 @@ from cryptography.hazmat.backends import default_backend
 from cryptography import x509
 from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography import utils
+import os
 import datetime
 
 
@@ -14,7 +17,7 @@ def get_certificate():
         x509.NameAttribute(NameOID.ORGANIZATION_NAME, u"Sec"),
         x509.NameAttribute(NameOID.COMMON_NAME, u"secureChat"),
     ])
-    with open("path/to/key.pem", "rb") as key_file:
+    with open("key.pem", "rb") as key_file:
         private_key = serialization.load_pem_private_key(
             key_file.read(),
             password = 'nsaplsnospythanks',
@@ -27,7 +30,7 @@ def get_certificate():
     ).public_key(
         private_key.public_key()
     ).serial_number(
-        x509.random_serial_number()
+        utils.int_from_bytes(os.urandom(20), "big") >> 1  # to support older versions of cryptography
     ).not_valid_before(
         datetime.datetime.utcnow()
     ).not_valid_after(
@@ -39,3 +42,20 @@ def get_certificate():
     del private_key
     return cert.public_bytes(serialization.Encoding.PEM)
 
+
+def sign_data(data):
+    with open("key.pem", "rb") as key_file:
+        private_key = serialization.load_pem_private_key(
+            key_file.read(),
+            password = 'nsaplsnospythanks',
+            backend = default_backend()
+        )
+    signer = private_key.signer(
+        padding.PSS(
+            mgf=padding.MGF1(hashes.SHA256()),
+            salt_length=padding.PSS.MAX_LENGTH),
+        hashes.SHA256())
+    message = str(data)
+    signer.update(message)
+    signature = signer.finalize()
+    return signature
