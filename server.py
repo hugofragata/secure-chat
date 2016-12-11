@@ -314,7 +314,7 @@ class Server:
                 sender.cipher_suite = request['ciphers'][0]
             else:
                 sender.cipher_suite = request['ciphers'][1]
-            msg = {'type': 'connect', 'phase': request['phase'] + 1, 'id': time.time(), 'ciphers': sender.cipher_suite, 'data': ""}
+            msg = {'type': 'connect', 'phase': request['phase'] + 1, 'id': time.time(), 'ciphers': sender.cipher_suite, 'data': base64.encodestring(get_certificate())}
             sender.send(msg)
             self.id2client[request['id']] = sender
             sender.id = request['id']
@@ -393,9 +393,11 @@ class Server:
         if sender.level != 200:
             return
 
-        pl = json.dumps({'type': 'list', 'data': self.clientList()})
-        plc = base64.encodestring(self.sec.encrypt_with_symmetric(pl, sender.sa_data))
-        sender.send({'type': 'secure', 'payload': plc})
+        data = json.dumps({'type': 'list', 'data': self.clientList()})
+        self.send_secure(data, sender)
+        # payload = {'sign': sign_data(data), 'data': data}
+        # plc = base64.encodestring(self.sec.encrypt_with_symmetric(payload, sender.sa_data))
+        # sender.send({'type': 'secure', 'payload': plc})
 
     def broadcast_new_list(self, init):
         for client in self.clients:
@@ -418,34 +420,48 @@ class Server:
         sender.num_msg += 1
         payload = base64.decodestring(request['payload'])
         try:
-            pl = self.sec.decrypt_with_symmetric(bytes(payload), sender.sa_data)
+            plainText_payload = self.sec.decrypt_with_symmetric(bytes(payload), sender.sa_data)
         except InvalidToken:
             logging.warning("Invalid key or integrity check fail from client %s" % sender)
             return
-        plj = json.loads(pl)
+        payload_json = json.loads(plainText_payload)
 
-        if not 'type' in plj.keys():
+        if not 'type' in payload_json.keys():
             logging.warning("Secure message without inner frame type")
             return
 
-        if plj['type'] == 'list':
-            self.processList(sender, plj)
+        if payload_json['type'] == 'list':
+            self.processList(sender, payload_json)
             return
 
-        if not all (k in plj.keys() for k in ("src", "dst")):
+        if not all (k in payload_json.keys() for k in ("src", "dst")):
             return
 
-        if not plj['dst'] in self.id2client.keys():
-            logging.warning("Message to unknown client: %s" % plj['dst'])
+        if not payload_json['dst'] in self.id2client.keys():
+            logging.warning("Message to unknown client: %s" % payload_json['dst'])
             return
 
-        dst = self.id2client[plj['dst']]
-        pl_to_peer = json.dumps(plj)
-        ciphered_pl_to_peer = base64.encodestring(self.sec.encrypt_with_symmetric(pl_to_peer, dst.sa_data))
+        dst = self.id2client[payload_json['dst']]
+        self.send_secure(plainText_payload, dst)
+        # pl_to_user = json.dumps({'sign': sign_data(plainText_payload), 'data': plainText_payload})
+        # ciphered_pl_to_peer = base64.encodestring(self.sec.encrypt_with_symmetric(pl_to_user, dst.sa_data))
+        # dst_message = {'type': 'secure', 'sa-data': 'not used', 'payload': ciphered_pl_to_peer}
+        # dst.send(dst_message)
 
-        dst_message = {'type': 'secure', 'sa-data': 'not used', 'payload': ciphered_pl_to_peer}
-        dst.send(dst_message)
-
+    def send_secure(self, msg, client):
+        '''
+        Used to make secure type messages
+        :param msg: msg to sign and encrypt
+         :type msg: string
+        :param client: message destination
+        :type client: Client
+        :return:  base64 encoded payload ready to send
+        '''
+        payload = json.dumps({'sign': sign_data(msg), 'data': msg})
+        # payload = json.dumps({'sign': "Tl9ogFxkVJXRCc5vUbXB242L+o3t7rchy5HBTJE1oGikXfMdik1gHdy6r8OBOTFXCCrtTm7sR4jg\nv7d0MQf/jtNcTc4Qb2Ac7ZXoamR3Xdzvz670kUB3iwSJUSW8ZhIuE19MXuZH06c24DpsWos9NaoC\nyePe4/9U9N9ljD79jT3cY7s392/JBMkeSDhwekI5STkD7k4LcXNyIiKw3ZhpXafxz3iOSQcBTrEe\nLrU7pARK9nrnwPmaQC9jXtiFyh808dAZdPFKQ8i0zBHhz6G/fjoA6X6xjzJtfDZk5hC4X2dlM4x+\nqP3+hImyM0QffmbJVtW/YqWFaPO+NJjtaAse6A==\n", 'data': msg})
+        c_payload = base64.encodestring(self.sec.encrypt_with_symmetric(payload, client.sa_data))
+        dst_message = {'type': 'secure', 'sa-data': 'not used', 'payload': c_payload}
+        client.send(dst_message)
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:

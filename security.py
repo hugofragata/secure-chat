@@ -86,20 +86,21 @@ class security:
         signature = signer.finalize()
         return signature
 
-    def rsa_verify_with_public_key(self, signature, public_key):
+    def rsa_verify_with_public_key(self, signature, message, public_key):
         if not signature or not public_key:
             raise security_error
         #public_key = load_pem_public_key(public_pem_data, backend=default_backend())
         if not isinstance(public_key, rsa.RSAPublicKey):
             raise security_error
-
+        signature = str(base64.decodestring(signature))
+        message = str(unicode(message))
         verifier = public_key.verifier(
             signature,
             padding.PSS(
                 mgf = padding.MGF1(hashes.SHA256()),
                 salt_length = padding.PSS.MAX_LENGTH),
             hashes.SHA256())
-        verifier.update(signature)
+        verifier.update(message)
         try:
             verifier.verify()
         except:

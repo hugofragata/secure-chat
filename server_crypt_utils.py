@@ -6,6 +6,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography import utils
 import os
+import base64
 import datetime
 
 
@@ -44,6 +45,12 @@ def get_certificate():
 
 
 def sign_data(data):
+    '''
+
+    :param data: data to be signed
+     :type data: string
+    :return: base64 encoded signature
+    '''
     with open("key.pem", "rb") as key_file:
         private_key = serialization.load_pem_private_key(
             key_file.read(),
@@ -58,4 +65,4 @@ def sign_data(data):
     message = str(data)
     signer.update(message)
     signature = signer.finalize()
-    return signature
+    return base64.encodestring(signature)

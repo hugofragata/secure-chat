@@ -259,7 +259,12 @@ class ConnectionManager(QtCore.QThread):
         except InvalidToken:
             print "decrypting error\n\n"
             return
+        # verifica se vem mesmo do servidor
         plj = json.loads(pl)
+        if not self.sec.rsa_verify_with_public_key(plj['sign'], plj['data'], self.server_pubkey):
+            print "Message not from server\n\n\n"
+            return
+        plj = json.loads(plj['data'])
 
         if plj['type'] == 'list':
             self.process_list(plj)
