@@ -4,7 +4,7 @@ from loginDialog import *
 from ConnectionManager import ConnectionManager, ConnectionManagerError
 from CustomListItem import UserListItem
 import t
-from User import User
+from User import SuperUser
 try:
     _fromUtf8 = QtCore.QString.fromUtf8
 except AttributeError:
@@ -56,9 +56,9 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
             QtGui.QApplication.restoreOverrideCursor()
             return
         if self.diag_ui.cartaoAuth.isChecked():
-            user = User(ccutils=self.ccutils)
+            user = SuperUser(ccutils=self.ccutils)
         else:
-            user = User(username)
+            user = SuperUser(username)
         try:
             self.comm = ConnectionManager(address, port, self, user)
         except ConnectionManagerError:

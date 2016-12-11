@@ -14,7 +14,8 @@ class Ccutils:
         print self.slots
         self.session = self.pkcs11.openSession(self.slots[0])
 
-    def verify_certificate(self, cert_pem):
+    @staticmethod
+    def verify_certificate(cert_pem):
         '''
         Verifies whether a provided Portuguese Citizenship Card Certificate is valid
         :param cert_pem: The to-be validated certificate
@@ -50,7 +51,7 @@ class Ccutils:
             if l[0] == label:
                 return l[1]
 
-    def get_certificate(self, label):
+    def get_certificate(self, label="CITIZEN AUTHENTICATION CERTIFICATE"):
         objs = self.session.findObjects(template=((PyKCS11.CKA_LABEL, label), (PyKCS11.CKA_CLASS, PyKCS11.CKO_CERTIFICATE)))
         cer_bytes = objs[0].to_dict()["CKA_VALUE"]
         cer = ''.join(chr(c) for c in cer_bytes)

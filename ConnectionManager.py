@@ -175,6 +175,7 @@ class ConnectionManager(QtCore.QThread):
         if req['phase'] == 2:
             if self.user.connection_state != 2:
                 return
+            # TODO: verify server certificate
             if req['ciphers'] not in SUPPORTED_CIPHER_SUITES:
                 print "ERROR connecting to server"
                 msg = {'type': 'connect', 'phase': req['phase'] + 1, 'name': self.user.name, 'id': time.time(),
@@ -183,8 +184,13 @@ class ConnectionManager(QtCore.QThread):
                 self.user.connection_state = 1
                 return
             self.user.cipher_suite = req['ciphers']
+            #if self.user.ccauth:
+            #    data = {'cert': self.user.cc.get_certificate(), 'key': ""}
+             #   msg = {'type': 'connect', 'phase': req['phase'] + 1, 'name': self.user.name, 'id': time.time(),
+             #      'ciphers': self.user.cipher_suite, 'data': json.dumps(data)}
+           # else:
             msg = {'type': 'connect', 'phase': req['phase'] + 1, 'name': self.user.name, 'id': time.time(),
-                   'ciphers': self.user.cipher_suite, 'data': 'ok b0ss'}
+                       'ciphers': self.user.cipher_suite, 'data': 'ok b0ss'}
             self.send_message(json.dumps(msg))
             self.user.connection_state += 1
 

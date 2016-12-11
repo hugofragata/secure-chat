@@ -13,6 +13,7 @@ import sys
 import time
 import logging
 from cryptography.fernet import InvalidToken
+from server_crypt_utils import *
 
 # Server address
 HOST = ""   # All available interfaces
@@ -44,6 +45,7 @@ class Client:
         self.state = STATE_NONE
         self.name = "Unknown"
         self.cipher_suite = None
+        self.pub_key = None
 
     def __str__(self):
         """ Converts object into string.
