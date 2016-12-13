@@ -1,7 +1,5 @@
 import os
 import random
-
-import urandom
 from OpenSSL import crypto
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization

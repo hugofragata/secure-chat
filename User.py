@@ -12,6 +12,7 @@ class User:
         self.cipher_suite = None
         self.conn_check = None
         self.buffin = ""
+        self.waiting_acks = []
 
 
 class SuperUser(User):

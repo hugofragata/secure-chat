@@ -274,19 +274,8 @@ class ConnectionManager(QtCore.QThread):
             self.process_client_disconnect(plj)
         elif plj['type'] == 'client-com':
             self.process_client_com(plj)
-            self.send_ack_peer(plj['data'])
         elif plj['type'] == 'ack':
             self.process_client_ack(plj)
-
-    def send_ack_peer(self, comm_data):
-        hashed_data = base64.encodestring(self.sec.get_hash(base64.decodestring(comm_data)))
-        dst_id = self.peer_connected
-        msg_to_peer = json.dumps({'type': 'ack', 'src': self.user.id, 'dst': dst_id, 'data': hashed_data})
-
-        payload_to_server = self.sec.encrypt_with_symmetric(msg_to_peer, self.user.sa_data)
-        payload_to_server = base64.encodestring(payload_to_server)
-        msg_secure_ciphered = json.dumps({'type': 'secure', 'sa-data': 'not used', 'payload': payload_to_server})
-        self.send_message(msg_secure_ciphered)
 
     def process_client_com(self, payload_j):
         if not self.user.connection_state == 200:
@@ -326,12 +315,12 @@ class ConnectionManager(QtCore.QThread):
             self.emit(self.error_signal, "Invalid signature in peer msg!")
             return
         self.emit(self.signal, deciphered_data)
-        self.send_client_ack(payload_j['src'], payload_j['msg_id'])
+        self.send_client_ack(payload_j['src'], payload_j['id'])
         return
 
-    def send_client_ack(self, peer, msg_id):
+    def send_client_ack(self, peer, id):
         msg_to_client = json.dumps(
-            {'type': 'ack', 'src': self.user.id, 'dst': peer, 'msg_id': msg_id})
+            {'type': 'ack', 'src': self.user.id, 'dst': peer, 'id': id})
         payload_to_server = self.sec.encrypt_with_symmetric(msg_to_client, self.user.sa_data)
         payload_to_server = base64.encodestring(payload_to_server)
         msg_secure_ciphered = json.dumps({'type': 'secure', 'sa-data': 'not used', 'payload': payload_to_server})
@@ -339,7 +328,10 @@ class ConnectionManager(QtCore.QThread):
         return
 
     def process_client_ack(self, ack_json_from_peer):
-
+        id = ack_json_from_peer['id']
+        self.user.waiting_acks.remove(id)
+        print "Client ACK: "+id
+        #TODO: show this in interface
         return
 
     def send_client_comm(self, text):
@@ -351,8 +343,9 @@ class ConnectionManager(QtCore.QThread):
         dst_id = self.peer_connected
         #text = json.dumps({'src': self.user.id, 'dst': dst_id, 'data': text})
         ciphered_data_to_client = base64.encodestring(self.sec.encrypt_with_symmetric(text, dst_sym_key))
-        msg_id = self.sec.get_nonce()
-        msg_to_client = json.dumps({'type': 'client-com', 'src': self.user.id, 'dst': dst_id, 'msg_id':msg_id,'data': ciphered_data_to_client})
+        id = self.sec.get_nonce()
+        msg_to_client = json.dumps({'type': 'client-com', 'src': self.user.id, 'dst': dst_id, 'id':id,'data': ciphered_data_to_client})
+        self.user.waiting_acks.append(id)
         payload_to_server = self.sec.encrypt_with_symmetric(msg_to_client, self.user.sa_data)
         payload_to_server = base64.encodestring(payload_to_server)
         msg_secure_ciphered = json.dumps({'type': 'secure', 'sa-data': 'not used', 'payload': payload_to_server})
