@@ -1,4 +1,7 @@
 import os
+import random
+
+import urandom
 from OpenSSL import crypto
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
@@ -142,6 +145,30 @@ class security:
         else:
             return True
 
+
+    def verify_certificate(self, cert_pem):
+        '''
+        Verifies whether a provided Portuguese Citizenship Card Certificate is valid
+        :param cert_pem: The to-be validated certificate
+        :return: True or False
+        '''
+        certificate = crypto.load_certificate(crypto.FILETYPE_PEM, cert_pem)
+
+        # Create and fill a X509Sore with trusted certs
+        store = crypto.X509Store()
+        store.add_cert(crypto.load_certificate(crypto.FILETYPE_PEM, ROOT_CERT))
+        store.add_cert(crypto.load_certificate(crypto.FILETYPE_PEM, BUNDLE_CERTS))
+
+        # Now we add the crls to the X509 store
+        crl = crypto.load_crl(crypto.FILETYPE_PEM, CRL_CERTS)
+        store.add_crl(crl)
+
+        # Create a X590StoreContext with the cert and trusted certs
+        # and verify the the chain of trust
+        # verify_certificate() returns None if certificate can be validated
+        return (crypto.X509StoreContext(store, certificate).verify_certificate() == None)
+
+
     def get_pubkey_from_cert(self, cert):
         '''
         Returns the public key from a certificate
@@ -229,6 +256,8 @@ class security:
         h2 = self.get_hash(m2)
         return  hmac_value == h2
 
+    def get_nonce(self, length=16):
+        return ''.join([str(random.SystemRandom().randint(0, 9)) for i in range(length)])
 
 #TODO: implement key_pair rotation
 

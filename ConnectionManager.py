@@ -326,10 +326,21 @@ class ConnectionManager(QtCore.QThread):
             self.emit(self.error_signal, "Invalid signature in peer msg!")
             return
         self.emit(self.signal, deciphered_data)
+        self.send_client_ack(payload_j['src'], payload_j['msg_id'])
+        return
+
+    def send_client_ack(self, peer, msg_id):
+        msg_to_client = json.dumps(
+            {'type': 'ack', 'src': self.user.id, 'dst': peer, 'msg_id': msg_id})
+        payload_to_server = self.sec.encrypt_with_symmetric(msg_to_client, self.user.sa_data)
+        payload_to_server = base64.encodestring(payload_to_server)
+        msg_secure_ciphered = json.dumps({'type': 'secure', 'sa-data': 'not used', 'payload': payload_to_server})
+        self.send_message(msg_secure_ciphered)
         return
 
     def process_client_ack(self, ack_json_from_peer):
-        pass
+
+        return
 
     def send_client_comm(self, text):
         if self.peer_connected is None:
@@ -340,7 +351,8 @@ class ConnectionManager(QtCore.QThread):
         dst_id = self.peer_connected
         #text = json.dumps({'src': self.user.id, 'dst': dst_id, 'data': text})
         ciphered_data_to_client = base64.encodestring(self.sec.encrypt_with_symmetric(text, dst_sym_key))
-        msg_to_client = json.dumps({'type': 'client-com', 'src': self.user.id, 'dst': dst_id, 'data': ciphered_data_to_client})
+        msg_id = self.sec.get_nonce()
+        msg_to_client = json.dumps({'type': 'client-com', 'src': self.user.id, 'dst': dst_id, 'msg_id':msg_id,'data': ciphered_data_to_client})
         payload_to_server = self.sec.encrypt_with_symmetric(msg_to_client, self.user.sa_data)
         payload_to_server = base64.encodestring(payload_to_server)
         msg_secure_ciphered = json.dumps({'type': 'secure', 'sa-data': 'not used', 'payload': payload_to_server})
