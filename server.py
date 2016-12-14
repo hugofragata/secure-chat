@@ -45,6 +45,7 @@ class Client:
         self.name = "Unknown"
         self.cipher_suite = None
         self.pub_key = None
+        self.cc = False
 
     def __str__(self):
         """ Converts object into string.
@@ -348,6 +349,7 @@ class Server:
                         self.delClient(sender.socket)
                         return
                     user_cc_pubkey = get_pubkey_from_cert(cert_and_key['cert'])
+                    sender.cc = True
                     if not rsa_verify_with_public_key(cert_and_key['key_sign'], cert_and_key['key'], user_cc_pubkey,
                                                                pad=PADDING_PKCS1, hash_alg=SHA1):
                         logging.warning("Invalid signature in user")
@@ -387,7 +389,7 @@ class Server:
                 self.broadcast_new_list(sender)
                 logging.info("Client %s Connected" % request['id'])
 
-    def processList(self, sender, request):
+    def processList(self, sender):
         """
         Process a list message from a client
         """
@@ -398,13 +400,21 @@ class Server:
         if sender.level != 200:
             return
 
-        data = json.dumps({'type': 'list', 'data': self.clientList()})
+        filtered_client_list = []
+        if not sender.cc:
+            for client in self.clients:
+                if not client.cc:
+                    filtered_client_list.append(client.asDict())
+        else:
+            filtered_client_list = self.clientList()
+
+        data = json.dumps({'type': 'list', 'data': filtered_client_list})
         self.send_secure(data, sender)
 
     def broadcast_new_list(self, init):
         for client in self.clients:
             if self.clients[client] != init:
-                self.processList(self.clients[client], None)
+                self.processList(self.clients[client])
 
     def processSecure(self, sender, request):
         """
@@ -433,7 +443,7 @@ class Server:
             return
 
         if payload_json['type'] == 'list':
-            self.processList(sender, payload_json)
+            self.processList(sender)
             return
 
         if not all (k in payload_json.keys() for k in ("src", "dst")):
@@ -444,7 +454,8 @@ class Server:
             return
 
         dst = self.id2client[payload_json['dst']]
-
+        if not dst.cc and sender.cc:
+            return
         self.send_secure(plainText_payload, dst)
         # pl_to_user = json.dumps({'sign': sign_data(plainText_payload), 'data': plainText_payload})
         # ciphered_pl_to_peer = base64.encodestring(self.sec.encrypt_with_symmetric(pl_to_user, dst.sa_data))
