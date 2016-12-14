@@ -17,6 +17,7 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
         super(AppChat, self).__init__(parent)
         self.ccutils = ccutils
         self.comm = None
+        self.messages = []
         self.setupUi(self)
         self.login_dialog = QtGui.QDialog()
         self.diag_ui = Ui_Dialog()
@@ -71,6 +72,7 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
             self.connect(self.comm, self.comm.error_signal, self.show_error)
             self.connect(self.comm, self.comm.change_list, self.change_listitem)
             self.connect(self.comm, self.comm.append_msg_id, self.append_id)
+            self.connect(self.comm, self.comm.append_self_msg, self.append_self_msg)
             if self.diag_ui.radioButton.isChecked():
                 self.cipher_suite = 1
             else:
@@ -90,8 +92,7 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
         text = self.msgBox.toPlainText()
         if not text or text == "\n":
             return
-        self.textBrowser.append("(eu)> " + text)
-        self.comm.send_client_comm(str(text))
+        self.comm.send_client_comm(text)
         self.msgBox.clear()
 
     def list_users(self, user_list):
@@ -108,12 +109,27 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
         else:
             self.diag_ui.userName.setDisabled(False)
 
+    def append_self_msg(self, msg, id):
+        self.messages.append([msg, id, False])
+        self.textBrowser.append("<span><p style=\"color:red\">(eu)> " + msg + "</p><span>")
+
     def append_id(self, id, recieved):
-        if recieved:
-            self.textBrowser.append("<span><p style=\"font-size:6pt; color:green;\">> " + QtCore.QString.fromLatin1(id, len(id)) + "</p></span>")
-        else:
-            self.textBrowser.append(
-                "<span ><p style=\"font-size:6pt; color:red;\">> " + QtCore.QString.fromLatin1(id, len(id)) + "</p></span>")
+        self.textBrowser.clear()
+        for i in self.messages:
+            if i[2] is None:
+                self.textBrowser.append(
+                    "<span><p>" + i[1] + "> " + QtCore.QString.fromLatin1(i[0], len(i[0])) + "</p></span>")
+            else:
+                if i[1] == id:
+                    i[2] = True
+                if i[2]:
+                    self.textBrowser.append(
+                        "<span><p style=\"color:green\">(eu)> " + QtCore.QString.fromLatin1(i[0],
+                                                                                            len(i[0])) + "</p><span>")
+                elif not i[2]:
+                    self.textBrowser.append(
+                        "<span><p style=\"color:red\">(eu)> " + QtCore.QString.fromLatin1(i[0],
+                                                                                          len(i[0])) + "</p><span>")
         return
 
     def change_listitem(self, uid):
@@ -131,6 +147,7 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
                 item.setTextColor(QtGui.QColor(_fromUtf8("red")))
 
     def connect_to_user(self, item):
+        self.messages = []
         self.textBrowser.clear()
         self.textBrowser.setPlainText("Connecting to " + item.user_name)
         if self.actionRSA_WITH_AES_128.isChecked():
@@ -145,7 +162,8 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
         self.setWindowTitle("I am " + self.comm.user.name + ", talking to " + item.user_name)
 
     def updateChat(self, text):
-        self.textBrowser.append("<span>" + self.comm.peers[self.comm.peer_connected].name + "> " + QtCore.QString.fromLatin1(text, len(text)) + "</span>")
+        self.messages.append([text, self.comm.peers[self.comm.peer_connected].name, None])
+        self.textBrowser.append("<span><p>" + self.comm.peers[self.comm.peer_connected].name + "> " + QtCore.QString.fromLatin1(text, len(text)) + "</p></span>")
 
     def show_error(self, error):
         errorDiag = QtGui.QMessageBox()

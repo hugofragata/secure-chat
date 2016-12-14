@@ -17,7 +17,7 @@ SUPPORTED_CIPHER_SUITES = ["RSA_WITH_AES_128_CBC_SHA256", "ECDHE_WITH_AES_128_CB
 # TODO: autenticacao do servidor --> almost done
 # TODO: autenticacao dos users com cartao de cidadao
 # TODO: suportar mais cipher suites
-# TODO: destination validation
+
 
 
 class ConnectionManager(QtCore.QThread):
@@ -57,6 +57,7 @@ class ConnectionManager(QtCore.QThread):
         self.error_signal = QtCore.SIGNAL("errorSig")
         self.change_list = QtCore.SIGNAL("changeList")
         self.append_msg_id = QtCore.SIGNAL("append_msg_id")
+        self.append_self_msg = QtCore.SIGNAL("append_self_msg")
         try:
             self.s = socket.create_connection((ip, port))
         except:
@@ -332,7 +333,7 @@ class ConnectionManager(QtCore.QThread):
     def process_client_ack(self, ack_json_from_peer):
         id = ack_json_from_peer['id']
         self.user.waiting_acks.remove(id)
-        print "Client ACK: "+id
+        print "Client ACK: " + id
         self.emit(self.append_msg_id, id, True)
         return
 
@@ -343,12 +344,11 @@ class ConnectionManager(QtCore.QThread):
             return
         dst_sym_key = self.peers[self.peer_connected].sa_data
         dst_id = self.peer_connected
-        #text = json.dumps({'src': self.user.id, 'dst': dst_id, 'data': text})
         ciphered_data_to_client = base64.encodestring(self.sec.encrypt_with_symmetric(text, dst_sym_key))
         id = self.sec.get_nonce()
-        msg_to_client = json.dumps({'type': 'client-com', 'src': self.user.id, 'dst': dst_id, 'id':id,'data': ciphered_data_to_client})
+        msg_to_client = json.dumps({'type': 'client-com', 'src': self.user.id, 'dst': dst_id, 'id': id, 'data': ciphered_data_to_client})
         self.user.waiting_acks.append(id)
-        self.emit(self.append_msg_id, id, False)
+        self.emit(self.append_self_msg, text, id)
         payload_to_server = self.sec.encrypt_with_symmetric(msg_to_client, self.user.sa_data)
         payload_to_server = base64.encodestring(payload_to_server)
         msg_secure_ciphered = json.dumps({'type': 'secure', 'sa-data': 'not used', 'payload': payload_to_server})
