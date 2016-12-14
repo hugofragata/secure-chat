@@ -56,6 +56,7 @@ class ConnectionManager(QtCore.QThread):
         self.list_signal = QtCore.SIGNAL("userList")
         self.error_signal = QtCore.SIGNAL("errorSig")
         self.change_list = QtCore.SIGNAL("changeList")
+        self.append_msg_id = QtCore.SIGNAL("append_msg_id")
         try:
             self.s = socket.create_connection((ip, port))
         except:

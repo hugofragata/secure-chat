@@ -70,6 +70,7 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
             self.connect(self.comm, self.comm.list_signal, self.list_users)
             self.connect(self.comm, self.comm.error_signal, self.show_error)
             self.connect(self.comm, self.comm.change_list, self.change_listitem)
+            self.connect(self.comm, self.comm.append_msg_id, self.append_id)
             if self.diag_ui.radioButton.isChecked():
                 self.cipher_suite = 1
             else:
@@ -89,7 +90,7 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
         text = self.msgBox.toPlainText()
         if not text or text == "\n":
             return
-        self.textBrowser.append(self.comm.user.name + "(eu)> " + text)
+        self.textBrowser.append("(eu)> " + text)
         self.comm.send_client_comm(str(text))
         self.msgBox.clear()
 
@@ -106,6 +107,14 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
             self.diag_ui.userName.setDisabled(True)
         else:
             self.diag_ui.userName.setDisabled(False)
+
+    def append_id(self, id, recieved):
+        if recieved:
+            self.textBrowser.append("<span style=\"font-size:7pt;\">> " + QtCore.QString.fromLatin1(id, len(id)) + "</span>")
+        else:
+            self.textBrowser.append(
+                "<span style=\"font-size:7pt;\">> " + QtCore.QString.fromLatin1(id, len(id)) + "</span>")
+        return
 
     def change_listitem(self, uid):
         for i in xrange(self.listWidget.count()):
