@@ -7,7 +7,6 @@
 # :set expandtab ts=4
 from socket import *
 from select import *
-from security import *
 import json
 import sys
 import time
@@ -128,7 +127,6 @@ class Server:
         # clients to manage (indexed by socket and by name):
         self.clients = {}       # clients (key is socket)
         self.id2client = {}   # clients (key is id)
-        self.sec = security()
 
     def stop(self):
         """ Stops the server closing all sockets
@@ -344,17 +342,17 @@ class Server:
                         self.delClient(sender.socket)
                         return
                     # verify certificate
-                    if not self.sec.verify_certificate(cert_and_key['cert']):
+                    if not verify_certificate(cert_and_key['cert']):
                         logging.warning("Invalid certificate for user")
                         self.delClient(sender.socket)
                         return
-                    user_cc_pubkey = self.sec.get_pubkey_from_cert(cert_and_key['cert'])
-                    if not self.sec.rsa_verify_with_public_key(cert_and_key['key_sign'],cert_and_key['key'], user_cc_pubkey,
+                    user_cc_pubkey = get_pubkey_from_cert(cert_and_key['cert'])
+                    if not rsa_verify_with_public_key(cert_and_key['key_sign'], cert_and_key['key'], user_cc_pubkey,
                                                                pad=PADDING_PKCS1, hash_alg=SHA1):
                         logging.warning("Invalid signature in user")
                         self.delClient(sender.socket)
                         return
-                    sender.pub_key = self.sec.rsa_public_pem_to_key(str(cert_and_key['key']))
+                    sender.pub_key = rsa_public_pem_to_key(str(cert_and_key['key']))
                     self.connect_phase3(sender, request)
 
         elif sender.level == 2 and request['phase'] == 5:
@@ -363,10 +361,10 @@ class Server:
                 logging.warning("Missing fields")
                 return
             if sender.cipher_suite == SUPPORTED_CIPHER_SUITES[0]:
-                session_key = self.sec.rsa_decrypt_with_private_key(base64.decodestring(request['data']), sender.sa_data)
+                session_key = rsa_decrypt_with_private_key(request['data'], sender.sa_data)
                 sender.sa_data = session_key
                 del session_key
-                to_send = self.sec.encrypt_with_symmetric(self.sec.get_hash(bytes(str(request['id']) + request['data'])), sender.sa_data)
+                to_send = encrypt_with_symmetric(get_hash(bytes(str(request['id']) + request['data'])), sender.sa_data)
                 to_send = base64.encodestring(to_send)
                 msg = {'type': 'connect', 'phase': request['phase'] + 1, 'id': time.time(),
                        'ciphers': sender.cipher_suite, 'data': to_send}
@@ -376,8 +374,8 @@ class Server:
                 self.broadcast_new_list(sender)
                 logging.info("Client %s Connected" % request['id'])
             elif sender.cipher_suite == SUPPORTED_CIPHER_SUITES[1]:
-                peer_key = self.sec.rsa_public_pem_to_key(base64.decodestring(request['data']))
-                session_key = self.sec.ecdh_get_shared_secret(sender.sa_data, peer_key)
+                peer_key = rsa_public_pem_to_key(base64.decodestring(request['data']))
+                session_key = ecdh_get_shared_secret(sender.sa_data, peer_key)
                 sender.sa_data = session_key
                 del session_key
                 msg = {'type': 'connect', 'phase': request['phase'] + 1, 'id': time.time(),
@@ -423,7 +421,7 @@ class Server:
         sender.num_msg += 1
         payload = base64.decodestring(request['payload'])
         try:
-            plainText_payload = self.sec.decrypt_with_symmetric(bytes(payload), sender.sa_data)
+            plainText_payload = decrypt_with_symmetric(bytes(payload), sender.sa_data)
         except InvalidToken:
             logging.warning("Invalid key or integrity check fail from client %s" % sender)
             return
@@ -453,21 +451,21 @@ class Server:
 
     def connect_phase3(self, sender, request):
         if sender.cipher_suite == SUPPORTED_CIPHER_SUITES[0]:
-            priv_key, pub_key = self.sec.rsa_gen_key_pair()
+            priv_key, pub_key = rsa_gen_key_pair()
             sender.sa_data = priv_key
             del priv_key
             msg = {'type': 'connect', 'phase': request['phase'] + 1, 'id': time.time(),
-                   'ciphers': sender.cipher_suite, 'data': base64.encodestring(self.sec.rsa_public_key_to_pem(pub_key))}
+                   'ciphers': sender.cipher_suite, 'data': pub_key}
             sender.send(msg)
             sender.level = 2
             return
         elif sender.cipher_suite == SUPPORTED_CIPHER_SUITES[1]:
-            priv_key, peer_key = self.sec.ecdh_gen_key_pair()
+            priv_key, peer_key = ecdh_gen_key_pair()
             sender.sa_data = priv_key
             del priv_key
             msg = {'type': 'connect', 'phase': request['phase'] + 1, 'id': time.time(),
                    'ciphers': sender.cipher_suite,
-                   'data': base64.encodestring(self.sec.rsa_public_key_to_pem(peer_key))}
+                   'data': peer_key}
             sender.send(msg)
             sender.level = 2
             return
@@ -484,7 +482,7 @@ class Server:
         '''
         payload = json.dumps({'sign': sign_data(msg), 'data': msg})
         # payload = json.dumps({'sign': "Tl9ogFxkVJXRCc5vUbXB242L+o3t7rchy5HBTJE1oGikXfMdik1gHdy6r8OBOTFXCCrtTm7sR4jg\nv7d0MQf/jtNcTc4Qb2Ac7ZXoamR3Xdzvz670kUB3iwSJUSW8ZhIuE19MXuZH06c24DpsWos9NaoC\nyePe4/9U9N9ljD79jT3cY7s392/JBMkeSDhwekI5STkD7k4LcXNyIiKw3ZhpXafxz3iOSQcBTrEe\nLrU7pARK9nrnwPmaQC9jXtiFyh808dAZdPFKQ8i0zBHhz6G/fjoA6X6xjzJtfDZk5hC4X2dlM4x+\nqP3+hImyM0QffmbJVtW/YqWFaPO+NJjtaAse6A==\n", 'data': msg})
-        c_payload = base64.encodestring(self.sec.encrypt_with_symmetric(payload, client.sa_data))
+        c_payload = base64.encodestring(encrypt_with_symmetric(payload, client.sa_data))
         dst_message = {'type': 'secure', 'sa-data': 'not used', 'payload': c_payload}
         client.send(dst_message)
 
