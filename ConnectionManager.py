@@ -298,6 +298,7 @@ class ConnectionManager(QtCore.QThread):
                 return
             self.peers[payload_j['src']].buffin += deciphered_data + "\n\n"
             self.emit(self.change_list, payload_j['src'])
+            self.send_client_ack(payload_j['src'], payload_j['id'])
             return
         if self.peer_connected is None:
             return

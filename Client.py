@@ -110,10 +110,10 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
 
     def append_id(self, id, recieved):
         if recieved:
-            self.textBrowser.append("<span style=\"font-size:7pt;\">> " + QtCore.QString.fromLatin1(id, len(id)) + "</span>")
+            self.textBrowser.append("<span><p style=\"font-size:6pt; color:green;\">> " + QtCore.QString.fromLatin1(id, len(id)) + "</p></span>")
         else:
             self.textBrowser.append(
-                "<span style=\"font-size:7pt;\">> " + QtCore.QString.fromLatin1(id, len(id)) + "</span>")
+                "<span ><p style=\"font-size:6pt; color:red;\">> " + QtCore.QString.fromLatin1(id, len(id)) + "</p></span>")
         return
 
     def change_listitem(self, uid):
