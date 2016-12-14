@@ -332,7 +332,7 @@ class ConnectionManager(QtCore.QThread):
         id = ack_json_from_peer['id']
         self.user.waiting_acks.remove(id)
         print "Client ACK: "+id
-        #TODO: show this in interface
+        self.emit(self.append_msg_id, id, True)
         return
 
     def send_client_comm(self, text):
@@ -347,6 +347,7 @@ class ConnectionManager(QtCore.QThread):
         id = self.sec.get_nonce()
         msg_to_client = json.dumps({'type': 'client-com', 'src': self.user.id, 'dst': dst_id, 'id':id,'data': ciphered_data_to_client})
         self.user.waiting_acks.append(id)
+        self.emit(self.append_msg_id, id, False)
         payload_to_server = self.sec.encrypt_with_symmetric(msg_to_client, self.user.sa_data)
         payload_to_server = base64.encodestring(payload_to_server)
         msg_secure_ciphered = json.dumps({'type': 'secure', 'sa-data': 'not used', 'payload': payload_to_server})

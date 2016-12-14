@@ -236,7 +236,6 @@ class security:
         return (Fernet(key), str(salt))
 
     def get_derived_symmetric_key(self, original_key, salt):
-
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=128,
