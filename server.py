@@ -275,7 +275,7 @@ class Server:
             client.send({'type': 'ack'})
 
             if req['type'] == 'connect':
-                self.processConnect(client, req)
+                self.processConnect(client, req, request)
             elif req['type'] == 'secure':
                 self.processSecure(client, req)
             elif req['type'] == 'disconnect':
@@ -292,7 +292,7 @@ class Server:
             cl.append(self.clients[k].asDict())
         return cl
 
-    def processConnect(self, sender, request):
+    def processConnect(self, sender, request, inText):
         """
         Process a connect message from a client
         """
@@ -310,7 +310,8 @@ class Server:
                 sender.cipher_suite = request['ciphers'][0]
             else:
                 sender.cipher_suite = request['ciphers'][1]
-            msg = {'type': 'connect', 'phase': request['phase'] + 1, 'id': time.time(), 'ciphers': sender.cipher_suite, 'data': base64.encodestring(get_certificate())}
+            msg = {'type': 'connect', 'phase': request['phase'] + 1, 'id': time.time(), 'ciphers': sender.cipher_suite,
+                   'data': base64.encodestring(get_certificate()), 'sign': sign_data(inText)}
             sender.send(msg)
             self.id2client[request['id']] = sender
             sender.id = request['id']
@@ -443,6 +444,7 @@ class Server:
             return
 
         dst = self.id2client[payload_json['dst']]
+
         self.send_secure(plainText_payload, dst)
         # pl_to_user = json.dumps({'sign': sign_data(plainText_payload), 'data': plainText_payload})
         # ciphered_pl_to_peer = base64.encodestring(self.sec.encrypt_with_symmetric(pl_to_user, dst.sa_data))
@@ -474,15 +476,15 @@ class Server:
     def send_secure(self, msg, client):
         '''
         Used to make secure type messages
-        :param msg: msg to sign and encrypt
+        :param msg: msg to encrypt
          :type msg: string
         :param client: message destination
         :type client: Client
         :return:  base64 encoded payload ready to send
         '''
-        payload = json.dumps({'sign': sign_data(msg), 'data': msg})
+        #payload = json.dumps({'sign': sign_data(msg), 'data': msg})
         # payload = json.dumps({'sign': "Tl9ogFxkVJXRCc5vUbXB242L+o3t7rchy5HBTJE1oGikXfMdik1gHdy6r8OBOTFXCCrtTm7sR4jg\nv7d0MQf/jtNcTc4Qb2Ac7ZXoamR3Xdzvz670kUB3iwSJUSW8ZhIuE19MXuZH06c24DpsWos9NaoC\nyePe4/9U9N9ljD79jT3cY7s392/JBMkeSDhwekI5STkD7k4LcXNyIiKw3ZhpXafxz3iOSQcBTrEe\nLrU7pARK9nrnwPmaQC9jXtiFyh808dAZdPFKQ8i0zBHhz6G/fjoA6X6xjzJtfDZk5hC4X2dlM4x+\nqP3+hImyM0QffmbJVtW/YqWFaPO+NJjtaAse6A==\n", 'data': msg})
-        c_payload = base64.encodestring(encrypt_with_symmetric(payload, client.sa_data))
+        c_payload = base64.encodestring(encrypt_with_symmetric(msg, client.sa_data))
         dst_message = {'type': 'secure', 'sa-data': 'not used', 'payload': c_payload}
         client.send(dst_message)
 

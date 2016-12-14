@@ -118,6 +118,7 @@ class ConnectionManager(QtCore.QThread):
         else:
             # shouldnt happen
             return
+        self.user.sa_data = msg
         self.send_message(msg)
         self.user.connection_state += 1
         self.connecting_event.clear()
@@ -186,6 +187,9 @@ class ConnectionManager(QtCore.QThread):
                 return
             print "CERTIFICATE VALID\n\n\n\n\n\n"
             self.server_pubkey = self.sec.get_pubkey_from_cert(cert)
+            if not self.sec.rsa_verify_with_public_key(req['sign'], self.user.sa_data, self.server_pubkey):
+                print "ERROR wrong signature\n\n\n\n\n"
+                return
 
             if req['ciphers'] not in SUPPORTED_CIPHER_SUITES:
                 print "ERROR connecting to server"
@@ -261,12 +265,11 @@ class ConnectionManager(QtCore.QThread):
         except InvalidToken:
             print "decrypting error\n\n"
             return
-        # verifica se vem mesmo do servidor
         plj = json.loads(pl)
-        if not self.sec.rsa_verify_with_public_key(plj['sign'], plj['data'], self.server_pubkey):
-            print "Message not from server\n\n\n"
-            return
-        plj = json.loads(plj['data'])
+        #if not self.sec.rsa_verify_with_public_key(plj['sign'], plj['data'], self.server_pubkey):
+        #    print "Message not from server\n\n\n"
+        #    return
+        #plj = json.loads(plj['data'])
 
         if plj['type'] == 'list':
             self.process_list(plj)
@@ -655,7 +658,7 @@ class ConnectionManager(QtCore.QThread):
         if not phase or not name or not id or not ciphers:
             return None
         return json.dumps(
-            {"type": "connect", "phase": int(phase), "name": name, "id": id, "ciphers": ciphers, "data": data})
+            {"type": "connect", "phase": int(phase), "name": name, "id": id, "ciphers": ciphers, "data": data, "nonce": self.sec.get_nonce()})
 
     def form_json_secure(self, type, sa_data, payload):
         if not type or not sa_data or not payload:

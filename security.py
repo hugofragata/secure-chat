@@ -120,6 +120,7 @@ class security:
         try:
             verifier.verify()
         except:
+
             return False
         else:
             return True

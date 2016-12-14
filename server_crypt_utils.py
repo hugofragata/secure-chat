@@ -21,7 +21,12 @@ PADDING_PKCS1 = padding.PKCS1v15()
 SHA2 = hashes.SHA256()
 SHA1 = hashes.SHA1()
 
+
 def get_certificate():
+    '''
+    Create a self signed certificate with the server private key
+    :return: Certificate PEM encoded
+    '''
     subject = issuer = x509.Name([
         x509.NameAttribute(NameOID.COUNTRY_NAME, u"PT"),
         x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, u"AV"),
@@ -112,6 +117,12 @@ def ecdh_gen_key_pair():
 
 
 def ecdh_get_shared_secret(private_key, partner_public_key):
+    '''
+    Derive the session key from the parner public key
+    :param private_key:
+    :param partner_public_key:
+    :return: The session key
+    '''
     shared_key = private_key.exchange(ec.ECDH(), partner_public_key)
     shared_key = ConcatKDFHash(
         algorithm=hashes.SHA256(),
