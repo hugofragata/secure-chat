@@ -11,6 +11,7 @@ from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives.asymmetric import ec
 from OpenSSL import crypto
 import os
+import random
 import base64
 import datetime
 
@@ -247,3 +248,7 @@ def get_hash(text):
     digest = hashes.Hash(hashes.SHA256(), backend=default_backend())
     digest.update(text)
     return digest.finalize()
+
+
+def get_nonce(length=16):
+    return ''.join([str(random.SystemRandom().randint(0, 9)) for i in range(length)])

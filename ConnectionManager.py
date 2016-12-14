@@ -214,9 +214,12 @@ class ConnectionManager(QtCore.QThread):
         if req['phase'] == 4:
             if self.user.connection_state != 3:
                 return
+            if len(req['data']) == 0 or len(req['sign']) == 0:
+                return
+            if not self.sec.rsa_verify_with_public_key(req['sign'], req['id']+req['ciphers']+req['data'], self.server_pubkey):
+                print "ERROR in server msg"
+                return
             if self.user.cipher_suite == SUPPORTED_CIPHER_SUITES[0]:
-                if len(req['data']) == 0:
-                    return
                 server_pubkey = self.sec.rsa_public_pem_to_key(base64.decodestring(req['data']))
                 self.user.sa_data = self.sec.generate_key_symmetric()
                 to_send = self.sec.rsa_encrypt_with_public_key(self.user.sa_data, server_pubkey)

@@ -311,7 +311,7 @@ class Server:
                 sender.cipher_suite = request['ciphers'][0]
             else:
                 sender.cipher_suite = request['ciphers'][1]
-            msg = {'type': 'connect', 'phase': request['phase'] + 1, 'id': time.time(), 'ciphers': sender.cipher_suite,
+            msg = {'type': 'connect', 'phase': request['phase'] + 1, 'id': get_nonce(), 'ciphers': sender.cipher_suite,
                    'data': base64.encodestring(get_certificate()), 'sign': sign_data(inText)}
             sender.send(msg)
             self.id2client[request['id']] = sender
@@ -362,32 +362,9 @@ class Server:
             print "LEVEL 2 \n\n"
             if 'data' not in request.keys():
                 logging.warning("Missing fields")
+                self.delClient(sender.socket)
                 return
-            if sender.cipher_suite == SUPPORTED_CIPHER_SUITES[0]:
-                session_key = rsa_decrypt_with_private_key(request['data'], sender.sa_data)
-                sender.sa_data = session_key
-                del session_key
-                to_send = encrypt_with_symmetric(get_hash(bytes(str(request['id']) + request['data'])), sender.sa_data)
-                to_send = base64.encodestring(to_send)
-                msg = {'type': 'connect', 'phase': request['phase'] + 1, 'id': time.time(),
-                       'ciphers': sender.cipher_suite, 'data': to_send}
-                sender.send(msg)
-                sender.level = 200
-                sender.setState(STATE_CONNECTED)
-                self.broadcast_new_list(sender)
-                logging.info("Client %s Connected" % request['id'])
-            elif sender.cipher_suite == SUPPORTED_CIPHER_SUITES[1]:
-                peer_key = rsa_public_pem_to_key(base64.decodestring(request['data']))
-                session_key = ecdh_get_shared_secret(sender.sa_data, peer_key)
-                sender.sa_data = session_key
-                del session_key
-                msg = {'type': 'connect', 'phase': request['phase'] + 1, 'id': time.time(),
-                       'ciphers': sender.cipher_suite, 'data': "ok ecdh done"}
-                sender.send(msg)
-                sender.level = 200
-                sender.setState(STATE_CONNECTED)
-                self.broadcast_new_list(sender)
-                logging.info("Client %s Connected" % request['id'])
+            self.connect_phase5(sender, request)
 
     def processList(self, sender):
         """
@@ -403,8 +380,8 @@ class Server:
         filtered_client_list = []
         if not sender.cc:
             for client in self.clients:
-                if not client.cc:
-                    filtered_client_list.append(client.asDict())
+                if not self.clients[client].cc:
+                    filtered_client_list.append(self.clients[client].asDict())
         else:
             filtered_client_list = self.clientList()
 
@@ -465,24 +442,41 @@ class Server:
     def connect_phase3(self, sender, request):
         if sender.cipher_suite == SUPPORTED_CIPHER_SUITES[0]:
             priv_key, pub_key = rsa_gen_key_pair()
-            sender.sa_data = priv_key
-            del priv_key
-            msg = {'type': 'connect', 'phase': request['phase'] + 1, 'id': time.time(),
-                   'ciphers': sender.cipher_suite, 'data': pub_key}
-            sender.send(msg)
-            sender.level = 2
-            return
         elif sender.cipher_suite == SUPPORTED_CIPHER_SUITES[1]:
-            priv_key, peer_key = ecdh_gen_key_pair()
-            sender.sa_data = priv_key
-            del priv_key
-            msg = {'type': 'connect', 'phase': request['phase'] + 1, 'id': time.time(),
-                   'ciphers': sender.cipher_suite,
-                   'data': peer_key}
-            sender.send(msg)
-            sender.level = 2
+            priv_key, pub_key = ecdh_gen_key_pair()
+        else:
+            logging.warning("ERRO")
+            self.delClient(sender.socket)
             return
+        sender.sa_data = priv_key
+        msg = {'type': 'connect', 'phase': request['phase'] + 1, 'id': get_nonce(),
+               'ciphers': sender.cipher_suite, 'data': pub_key}
+        msg['sign'] = sign_data(msg['id'] + msg['ciphers'] + msg['data'])
+        sender.send(msg)
+        sender.level = 2
         return
+
+    def connect_phase5(self, sender, request):
+        if sender.cipher_suite == SUPPORTED_CIPHER_SUITES[0]:
+            sender.sa_data = rsa_decrypt_with_private_key(request['data'], sender.sa_data)
+            to_send = encrypt_with_symmetric(get_hash(bytes(str(request['id']) + request['data'])), sender.sa_data)
+            to_send = base64.encodestring(to_send)
+        elif sender.cipher_suite == SUPPORTED_CIPHER_SUITES[1]:
+            peer_key = rsa_public_pem_to_key(base64.decodestring(request['data']))
+            sender.sa_data = ecdh_get_shared_secret(sender.sa_data, peer_key)
+            to_send = "ok ecdh done"
+        else:
+            logging.warning("ERRO")
+            self.delClient(sender.socket)
+            return
+        msg = {'type': 'connect', 'phase': request['phase'] + 1, 'id': get_nonce(),
+               'ciphers': sender.cipher_suite, 'data': to_send}
+        #msg['sign']
+        sender.send(msg)
+        sender.level = 200
+        sender.setState(STATE_CONNECTED)
+        self.broadcast_new_list(sender)
+        logging.info("Client %s Connected" % sender.id)
 
     def send_secure(self, msg, client):
         '''

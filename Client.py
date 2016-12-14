@@ -159,7 +159,7 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
         item.setText(item.user_name)
         item.num = 0
         item.setTextColor(QtGui.QColor(_fromUtf8("black")))
-        self.setWindowTitle("I am " + self.comm.user.name + ", talking to " + item.user_name)
+        self.setWindowTitle("I am " + QtCore.QString.fromLatin1(self.comm.user.name, len(self.comm.user.name)) + ", talking to " + item.user_name)
 
     def updateChat(self, text):
         self.messages.append([text, self.comm.peers[self.comm.peer_connected].name, None])
