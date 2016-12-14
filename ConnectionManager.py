@@ -3,7 +3,7 @@ import socket
 from select import *
 import threading
 import time
-from User import User
+from User import User, SuperUser
 from PyQt4 import QtCore
 from security import *
 import base64
@@ -14,11 +14,10 @@ TERMINATOR = "\n\n"
 SUPPORTED_CIPHER_SUITES = ["RSA_WITH_AES_128_CBC_SHA256", "ECDHE_WITH_AES_128_CBC_SHA256", "NONE"]
 
 # TODO: part2
-# TODO: autenticacao do servidor
+# TODO: autenticacao do servidor --> almost done
 # TODO: autenticacao dos users com cartao de cidadao
 # TODO: suportar mais cipher suites
 # TODO: destination validation
-# TODO: 
 
 
 class ConnectionManager(QtCore.QThread):
@@ -28,7 +27,7 @@ class ConnectionManager(QtCore.QThread):
         :param port: tcp port
         :param gui:
         :param user: all info about this user
-        :type user: User
+        :type user: SuperUser
         """
         # User stuff
         self.user = user
@@ -179,7 +178,6 @@ class ConnectionManager(QtCore.QThread):
             if len(req['data']) <= 0:
                 print "ERROR connecting to server: NO CERTIFICATE"
                 return
-
             cert = base64.decodestring(req['data'])
             if not self.sec.verify_self_signed_cert(cert):
                 print "ERROR connecting to server: INVALID CERTIFICATE"
@@ -195,12 +193,14 @@ class ConnectionManager(QtCore.QThread):
                 self.user.connection_state = 1
                 return
             self.user.cipher_suite = req['ciphers']
-            #if self.user.ccauth:
-            #    data = {'cert': self.user.cc.get_certificate(), 'key': ""}
-             #   msg = {'type': 'connect', 'phase': req['phase'] + 1, 'name': self.user.name, 'id': time.time(),
-             #      'ciphers': self.user.cipher_suite, 'data': json.dumps(data)}
-           # else:
-            msg = {'type': 'connect', 'phase': req['phase'] + 1, 'name': self.user.name, 'id': time.time(),
+            if self.user.ccauth:
+                self.user.priv_key, self.user.pub_key = self.sec.rsa_gen_key_pair()
+                pubkey_pem = self.sec.rsa_public_key_to_pem(self.user.pub_key)
+                data = {'cert': self.user.get_certificate(), 'key_sign': self.user.sign(pubkey_pem), 'key': pubkey_pem}
+                msg = {'type': 'connect', 'phase': req['phase'] + 1, 'name': self.user.name, 'id': time.time(),
+                       'ciphers': self.user.cipher_suite, 'data': json.dumps(data)}
+            else:
+                msg = {'type': 'connect', 'phase': req['phase'] + 1, 'name': self.user.name, 'id': time.time(),
                        'ciphers': self.user.cipher_suite, 'data': 'ok b0ss'}
             self.send_message(json.dumps(msg))
             self.user.connection_state += 1

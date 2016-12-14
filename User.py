@@ -34,7 +34,14 @@ class SuperUser(User):
         self.priv_key = None
 
     def sign(self, data):
-        pass
+        return self.cc.sign_data(data)
+
+    def get_certificate(self):
+        '''
+
+        :return: the user CITIZEN AUTHENTICATION KEY certificate
+        '''
+        return self.cc.get_certificate()
 
 class UserError(Exception):
     pass

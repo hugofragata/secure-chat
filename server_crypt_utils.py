@@ -21,8 +21,8 @@ def get_certificate():
     with open("key.pem", "rb") as key_file:
         private_key = serialization.load_pem_private_key(
             key_file.read(),
-            password = 'nsaplsnospythanks',
-            backend = default_backend()
+            password='nsaplsnospythanks',
+            backend=default_backend()
         )
     cert = x509.CertificateBuilder().subject_name(
         subject
@@ -54,8 +54,8 @@ def sign_data(data):
     with open("key.pem", "rb") as key_file:
         private_key = serialization.load_pem_private_key(
             key_file.read(),
-            password = 'nsaplsnospythanks',
-            backend = default_backend()
+            password='nsaplsnospythanks',
+            backend=default_backend()
         )
     signer = private_key.signer(
         padding.PSS(

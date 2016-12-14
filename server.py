@@ -282,8 +282,6 @@ class Server:
                 self.processSecure(client, req)
             elif req['type'] == 'disconnect':
                 self.delClient(client.socket)
-
-
         except Exception, e:
             logging.exception("Could not handle request")
 
@@ -325,31 +323,39 @@ class Server:
             print "LEVEL 1 \n\n"
             if "data" not in request.keys():
                 logging.warning("Missing fields")
+                self.delClient(sender.socket)
                 return
             if request['data'] == 'ok b0ss':
-                if sender.cipher_suite == SUPPORTED_CIPHER_SUITES[0]:
-                    priv_key, pub_key = self.sec.rsa_gen_key_pair()
-                    sender.sa_data = priv_key
-                    del priv_key
-                    msg = {'type': 'connect', 'phase': request['phase'] + 1, 'id': time.time(),
-                       'ciphers': sender.cipher_suite, 'data': base64.encodestring(self.sec.rsa_public_key_to_pem(pub_key))}
-                    sender.send(msg)
-                    sender.level = 2
-                    return
-                elif sender.cipher_suite == SUPPORTED_CIPHER_SUITES[1]:
-                    priv_key, peer_key = self.sec.ecdh_gen_key_pair()
-                    sender.sa_data = priv_key
-                    del priv_key
-                    msg = {'type': 'connect', 'phase': request['phase'] + 1, 'id': time.time(),
-                           'ciphers': sender.cipher_suite,
-                           'data': base64.encodestring(self.sec.rsa_public_key_to_pem(peer_key))}
-                    sender.send(msg)
-                    sender.level = 2
-                    return
+                self.connect_phase3(sender, request)
             elif request['data'] == 'not supported':
                 logging.warning("Connect message with missing fields")
                 self.delClient(sender.socket)
                 return
+            else:
+                try:
+                    cert_and_key = json.loads(request['data'])
+                except:
+                    logging.warning("Connect message with unknown fields")
+                    self.delClient(sender.socket)
+                    return
+                else:
+                    if 'cert' not in cert_and_key.keys() or 'key' not in cert_and_key.keys() or 'key_sign' not in cert_and_key.keys():
+                        logging.warning("Connect message with missing fields")
+                        self.delClient(sender.socket)
+                        return
+                    # verify certificate
+                    if not self.sec.verify_certificate(cert_and_key['cert']):
+                        logging.warning("Invalid certificate for user")
+                        self.delClient(sender.socket)
+                        return
+                    user_cc_pubkey = self.sec.get_pubkey_from_cert(cert_and_key['cert'])
+                    if not self.sec.rsa_verify_with_public_key(cert_and_key['key_sign'],cert_and_key['key'], user_cc_pubkey,
+                                                               pad=PADDING_PKCS1, hash_alg=SHA1):
+                        logging.warning("Invalid signature in user")
+                        self.delClient(sender.socket)
+                        return
+                    sender.pub_key = self.sec.rsa_public_pem_to_key(str(cert_and_key['key']))
+                    self.connect_phase3(sender, request)
 
         elif sender.level == 2 and request['phase'] == 5:
             print "LEVEL 2 \n\n"
@@ -395,9 +401,6 @@ class Server:
 
         data = json.dumps({'type': 'list', 'data': self.clientList()})
         self.send_secure(data, sender)
-        # payload = {'sign': sign_data(data), 'data': data}
-        # plc = base64.encodestring(self.sec.encrypt_with_symmetric(payload, sender.sa_data))
-        # sender.send({'type': 'secure', 'payload': plc})
 
     def broadcast_new_list(self, init):
         for client in self.clients:
@@ -447,6 +450,28 @@ class Server:
         # ciphered_pl_to_peer = base64.encodestring(self.sec.encrypt_with_symmetric(pl_to_user, dst.sa_data))
         # dst_message = {'type': 'secure', 'sa-data': 'not used', 'payload': ciphered_pl_to_peer}
         # dst.send(dst_message)
+
+    def connect_phase3(self, sender, request):
+        if sender.cipher_suite == SUPPORTED_CIPHER_SUITES[0]:
+            priv_key, pub_key = self.sec.rsa_gen_key_pair()
+            sender.sa_data = priv_key
+            del priv_key
+            msg = {'type': 'connect', 'phase': request['phase'] + 1, 'id': time.time(),
+                   'ciphers': sender.cipher_suite, 'data': base64.encodestring(self.sec.rsa_public_key_to_pem(pub_key))}
+            sender.send(msg)
+            sender.level = 2
+            return
+        elif sender.cipher_suite == SUPPORTED_CIPHER_SUITES[1]:
+            priv_key, peer_key = self.sec.ecdh_gen_key_pair()
+            sender.sa_data = priv_key
+            del priv_key
+            msg = {'type': 'connect', 'phase': request['phase'] + 1, 'id': time.time(),
+                   'ciphers': sender.cipher_suite,
+                   'data': base64.encodestring(self.sec.rsa_public_key_to_pem(peer_key))}
+            sender.send(msg)
+            sender.level = 2
+            return
+        return
 
     def send_secure(self, msg, client):
         '''

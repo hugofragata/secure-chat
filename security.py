@@ -15,7 +15,12 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 path_to_key = "./key.pem"
 SUPPORTED_CIPHER_SUITES = ["RSA_WITH_AES_128_CBC_SHA256", "ECDHE_WITH_AES_128_CBC_SHA256", "NONE"]
-
+PADDING_PSS = padding.PSS(
+                mgf=padding.MGF1(hashes.SHA256()),
+                salt_length=padding.PSS.MAX_LENGTH)
+PADDING_PKCS1 = padding.PKCS1v15()
+SHA2 = hashes.SHA256()
+SHA1 = hashes.SHA1()
 
 #TODO 1 shouldn't be a class, should be a set of fucntions only
 #TODO 2 when security module is called remove the instance
@@ -61,6 +66,10 @@ class security:
         return pem
 
     def rsa_gen_key_pair(self):
+        '''
+        Generate a private, public key pair
+        :return: (private_key, public_key)
+        '''
         priv_key = rsa.generate_private_key(65537, 4096, default_backend())
         pub_key = priv_key.public_key()
         return (priv_key, pub_key)
@@ -87,21 +96,27 @@ class security:
         signature = signer.finalize()
         return signature
 
-    def rsa_verify_with_public_key(self, signature, message, public_key):
+    def rsa_verify_with_public_key(self, signature, message, public_key, pad=PADDING_PSS, hash_alg=SHA2):
+        '''
+        :param signature: base64 encoded signature of the message
+        :param message: plain text signed message
+        :param public_key: the public key that will be used to verify
+        :type public_key: RSAPublicKey
+        :param pad: Padding algorithm to be used
+        :param hash_alg: Hash algorithm to be used
+        :return: True case valid or False case invalid
+        '''
         if not signature or not public_key:
             raise security_error
-        #public_key = load_pem_public_key(public_pem_data, backend=default_backend())
         if not isinstance(public_key, rsa.RSAPublicKey):
             raise security_error
         signature = str(base64.decodestring(signature))
-        message = str(unicode(message))
+        mes = str(unicode(message))
         verifier = public_key.verifier(
             signature,
-            padding.PSS(
-                mgf = padding.MGF1(hashes.SHA256()),
-                salt_length = padding.PSS.MAX_LENGTH),
-            hashes.SHA256())
-        verifier.update(message)
+            pad,
+            hash_alg)
+        verifier.update(mes)
         try:
             verifier.verify()
         except:
@@ -143,7 +158,6 @@ class security:
         else:
             return True
 
-
     def verify_certificate(self, cert_pem):
         '''
         Verifies whether a provided Portuguese Citizenship Card Certificate is valid
@@ -154,26 +168,44 @@ class security:
 
         # Create and fill a X509Sore with trusted certs
         store = crypto.X509Store()
-        store.add_cert(crypto.load_certificate(crypto.FILETYPE_PEM, ROOT_CERT))
-        store.add_cert(crypto.load_certificate(crypto.FILETYPE_PEM, BUNDLE_CERTS))
+        # store.add_cert(crypto.load_certificate(crypto.FILETYPE_PEM, open(ROOT_CERT, 'r').read()))
+        path = "./certs_dev/"
+        #print os.listdir(path)
+        for c in os.listdir(path):
+            pem = open(path + c, 'r').read()
+            #print c
+            store.add_cert(crypto.load_certificate(crypto.FILETYPE_PEM, pem))
 
         # Now we add the crls to the X509 store
-        crl = crypto.load_crl(crypto.FILETYPE_PEM, CRL_CERTS)
-        store.add_crl(crl)
-
+        #crl = crypto.load_crl(crypto.FILETYPE_PEM, CRL_CERTS)
+        #store.add_crl(crl)
+        context = crypto.X509StoreContext(store, certificate)
+        context.set_store(store)
         # Create a X590StoreContext with the cert and trusted certs
         # and verify the the chain of trust
         # verify_certificate() returns None if certificate can be validated
-        return (crypto.X509StoreContext(store, certificate).verify_certificate() == None)
+        valid = False
+        try:
+            valid = context.verify_certificate()
+        except crypto.X509StoreContextError as e:
+            print e.message
+            print e.certificate.get_subject()
+        else:
+            valid = True
+        return valid
 
-
-    def get_pubkey_from_cert(self, cert):
+    def get_pubkey_from_cert(self, cert, type="PEM"):
         '''
         Returns the public key from a certificate
+        :param type: "PEM" or "ASN1"
         :param cert: certificate in PEM format
         :return: the public key
         '''
-        certificate = crypto.load_certificate(crypto.FILETYPE_PEM, cert)
+        certificate = None
+        if type == "ASN1":
+            certificate = crypto.load_certificate(crypto.FILETYPE_ASN1, cert)
+        elif type == "PEM":
+            certificate = crypto.load_certificate(crypto.FILETYPE_PEM, cert)
         pem = crypto.dump_publickey(crypto.FILETYPE_PEM, certificate.get_pubkey())
         return self.rsa_public_pem_to_key(pem)
 
