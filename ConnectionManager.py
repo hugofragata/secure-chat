@@ -253,16 +253,13 @@ class ConnectionManager(QtCore.QThread):
                 check = self.sec.decrypt_with_symmetric(base64.decodestring(req['data']), self.user.sa_data)
                 if check != self.connect_check:
                     return
-                self.user.connection_state = 200
-                self.connect_check = ""
-                self.connecting_event.set()
+                del self.connect_check
                 # Connected!
             elif self.user.cipher_suite == SUPPORTED_CIPHER_SUITES[1]:
-                if req['data'] == "ok ecdh done":
-                    self.user.connection_state = 200
-                    self.connecting_event.set()
-                else:
+                if req['data'] != "ok ecdh done":
                     return
+            self.user.connection_state = 200
+            self.connecting_event.set()
 
     def process_secure(self, req):
         if self.user.connection_state != 200:
@@ -385,13 +382,12 @@ class ConnectionManager(QtCore.QThread):
                 self.send_client_disconnect(ccj['src'])
                 return
             if ccj['ciphers'][0] in SUPPORTED_CIPHER_SUITES:
-                msg = json.dumps({"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": ccj['src'], "phase": 2, "ciphers": ccj['ciphers'][0],
-                              "data": self.user.name})
+                msg = json.dumps({"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": ccj['src'],
+                                  "phase": 2, "ciphers": ccj['ciphers'][0], "data": self.user.name})
             elif ccj['ciphers'][1] in SUPPORTED_CIPHER_SUITES:
                 msg = json.dumps(
                     {"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": ccj['src'], "phase": 2,
-                     "ciphers": ccj['ciphers'][1],
-                     "data": self.user.name})
+                     "ciphers": ccj['ciphers'][1], "data": self.user.name})
             else:
                 del self.peers[ccj['src']]
                 self.send_client_disconnect(ccj['src'])
@@ -413,12 +409,12 @@ class ConnectionManager(QtCore.QThread):
                 return
             if ccj['ciphers'] not in SUPPORTED_CIPHER_SUITES:
                 self.emit(self.error_signal, "Erro a ligar ao utilizador! (Unsupported cipher suite)")
-                msg = json.dumps({"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": ccj['src'], "phase": 3, "ciphers": ccj['ciphers'],
-                              "data": "not supported"})
+                msg = json.dumps({"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": ccj['src'], "phase": 3,
+                                  "ciphers": ccj['ciphers'], "data": "not supported"})
                 del self.peers[ccj['src']]
             else:
-                msg = json.dumps({"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": ccj['src'], "phase": 3, "ciphers": ccj['ciphers'],
-                              "data": "ok b0ss"})
+                msg = json.dumps({"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": ccj['src'], "phase": 3,
+                                  "ciphers": ccj['ciphers'], "data": "ok b0ss"})
                 self.peers[ccj['src']].cipher_suite = ccj['ciphers']
                 self.peers[ccj['src']].connection_state = 3
             ciphered_pl = base64.encodestring(self.sec.encrypt_with_symmetric(msg, self.user.sa_data))
@@ -441,15 +437,11 @@ class ConnectionManager(QtCore.QThread):
             if self.peers[ccj['src']].cipher_suite == SUPPORTED_CIPHER_SUITES[0]:
                 priv_key, pub_key = self.sec.rsa_gen_key_pair()
                 self.peers[ccj['src']].sa_data = priv_key
-                priv_key = ""
+                del priv_key
                 msg = json.dumps(
                     {"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": ccj['src'], "phase": 4,
                      "ciphers": ccj['ciphers'],
                      "data": base64.encodestring(self.sec.rsa_public_key_to_pem(pub_key))})
-                ciphered_pl = base64.encodestring(self.sec.encrypt_with_symmetric(msg, self.user.sa_data))
-                secure_msg = {'type': 'secure', 'sa-data': 'aa', 'payload': ciphered_pl}
-                self.send_message(json.dumps(secure_msg))
-                self.peers[ccj['src']].connection_state = 3
             elif ccj['ciphers'] == SUPPORTED_CIPHER_SUITES[1]:
                 priv_key, pub_key = self.sec.ecdh_gen_key_pair()
                 self.peers[ccj['src']].sa_data = priv_key
@@ -458,10 +450,12 @@ class ConnectionManager(QtCore.QThread):
                     {"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": ccj['src'], "phase": 4,
                      "ciphers": ccj['ciphers'],
                      "data": base64.encodestring(self.sec.rsa_public_key_to_pem(pub_key))})
-                ciphered_pl = base64.encodestring(self.sec.encrypt_with_symmetric(msg, self.user.sa_data))
-                secure_msg = {'type': 'secure', 'sa-data': 'aa', 'payload': ciphered_pl}
-                self.send_message(json.dumps(secure_msg))
-                self.peers[ccj['src']].connection_state = 3
+            else:
+                return
+            ciphered_pl = base64.encodestring(self.sec.encrypt_with_symmetric(msg, self.user.sa_data))
+            secure_msg = {'type': 'secure', 'sa-data': 'aa', 'payload': ciphered_pl}
+            self.send_message(json.dumps(secure_msg))
+            self.peers[ccj['src']].connection_state = 3
 
         elif ccj['phase'] == 4:
             if ccj['src'] not in self.peers:
@@ -483,26 +477,23 @@ class ConnectionManager(QtCore.QThread):
                 self.peers[ccj['src']].sa_data = self.sec.generate_key_symmetric()
                 to_send = self.sec.rsa_encrypt_with_public_key(self.peers[ccj['src']].sa_data, user_pubkey)
                 to_send = base64.encodestring(to_send)
-                msg = {"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": ccj['src'], "phase": 5,
-                     "ciphers": ccj['ciphers'],
-                     "data": to_send}
-                ciphered_pl = base64.encodestring(self.sec.encrypt_with_symmetric(json.dumps(msg), self.user.sa_data))
-                secure_msg = {'type': 'secure', 'sa-data': 'aa', 'payload': ciphered_pl}
-                self.send_message(json.dumps(secure_msg))
-                self.peers[ccj['src']].connection_state = 4
+                msg = {"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": ccj['src'],
+                       "phase": 5, "ciphers": ccj['ciphers'], "data": to_send}
                 self.peers[ccj['src']].conn_check = self.sec.get_hash(bytes(str(msg['id']) + msg['data']))
             elif self.peers[ccj['src']].cipher_suite == SUPPORTED_CIPHER_SUITES[1]:
                 priv_key, pub_key = self.sec.ecdh_gen_key_pair()
                 peer_key = self.sec.rsa_public_pem_to_key(base64.decodestring(ccj['data']))
                 self.peers[ccj['src']].sa_data = self.sec.ecdh_get_shared_secret(priv_key, peer_key)
                 del priv_key
-                msg = {"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": ccj['src'], "phase": 5,
-                       "ciphers": ccj['ciphers'],
+                msg = {"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": ccj['src'],
+                       "phase": 5, "ciphers": ccj['ciphers'],
                        "data": base64.encodestring(self.sec.rsa_public_key_to_pem(pub_key))}
-                ciphered_pl = base64.encodestring(self.sec.encrypt_with_symmetric(json.dumps(msg), self.user.sa_data))
-                secure_msg = {'type': 'secure', 'sa-data': 'aa', 'payload': ciphered_pl}
-                self.send_message(json.dumps(secure_msg))
-                self.peers[ccj['src']].connection_state = 4
+            else:
+                return
+            ciphered_pl = base64.encodestring(self.sec.encrypt_with_symmetric(json.dumps(msg), self.user.sa_data))
+            secure_msg = {'type': 'secure', 'sa-data': 'aa', 'payload': ciphered_pl}
+            self.send_message(json.dumps(secure_msg))
+            self.peers[ccj['src']].connection_state = 4
 
         elif ccj['phase'] == 5:
             if ccj['src'] not in self.peers:
@@ -521,30 +512,21 @@ class ConnectionManager(QtCore.QThread):
                 to_send = self.sec.encrypt_with_symmetric(
                     self.sec.get_hash(bytes(str(ccj['id']) + ccj['data'])), self.peers[ccj['src']].sa_data)
                 to_send = base64.encodestring(to_send)
-                msg = json.dumps(
-                    {"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": ccj['src'], "phase": 6,
-                     "ciphers": ccj['ciphers'],
-                     "data": to_send})
-                ciphered_pl = base64.encodestring(self.sec.encrypt_with_symmetric(msg, self.user.sa_data))
-                secure_msg = {'type': 'secure', 'sa-data': 'aa', 'payload': ciphered_pl}
-                self.send_message(json.dumps(secure_msg))
-                self.peers[ccj['src']].connection_state = 200
-                self.emit(self.change_list, ccj['src'])
-                print "connected to peer \n\n\n\n"
             elif self.peers[ccj['src']].cipher_suite == SUPPORTED_CIPHER_SUITES[1]:
                 peer_key = self.sec.rsa_public_pem_to_key(base64.decodestring(ccj['data']))
                 self.peers[ccj['src']].sa_data = self.sec.ecdh_get_shared_secret(
                     self.peers[ccj['src']].sa_data, peer_key)
-                msg = json.dumps(
-                    {"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": ccj['src'], "phase": 6,
-                     "ciphers": ccj['ciphers'],
-                     "data": "ok ecdh done"})
-                ciphered_pl = base64.encodestring(self.sec.encrypt_with_symmetric(msg, self.user.sa_data))
-                secure_msg = {'type': 'secure', 'sa-data': 'aa', 'payload': ciphered_pl}
-                self.send_message(json.dumps(secure_msg))
-                self.peers[ccj['src']].connection_state = 200
-                self.emit(self.change_list, ccj['src'])
-                print "connected to peer ECDH\n\n\n\n"
+                to_send = "ok ecdh done"
+            else:
+                return
+            msg = json.dumps({"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id,
+                              "dst": ccj['src'], "phase": 6, "ciphers": ccj['ciphers'], "data": to_send})
+            ciphered_pl = base64.encodestring(self.sec.encrypt_with_symmetric(msg, self.user.sa_data))
+            secure_msg = {'type': 'secure', 'sa-data': 'aa', 'payload': ciphered_pl}
+            self.send_message(json.dumps(secure_msg))
+            self.peers[ccj['src']].connection_state = 200
+            self.emit(self.change_list, ccj['src'])
+            print "connected to peer \n\n\n\n"
 
         elif ccj['phase'] == 6:
             if ccj['src'] not in self.peers:
@@ -568,21 +550,17 @@ class ConnectionManager(QtCore.QThread):
                     self.send_client_disconnect(ccj['src'])
                     del self.peers[ccj['src']]
                     return
-                self.peers[ccj['src']].connection_state = 200
-                self.peers[ccj['src']].conn_check = None
-                print "connected phase 6"
-                self.peer_connected = ccj['src']
-                self.emit(self.signal, "Connected")
+                del self.peers[ccj['src']].conn_check
             elif self.peers[ccj['src']].cipher_suite == SUPPORTED_CIPHER_SUITES[1]:
-                if ccj['data'] == "ok ecdh done":
-                    self.peers[ccj['src']].connection_state = 200
-                    print "connected phase 6 ECDH"
-                    self.peer_connected = ccj['src']
-                    self.emit(self.signal, "Connected")
-                else:
+                if ccj['data'] != "ok ecdh done":
                     self.emit(self.error_signal, "Erro a ligar ao utilizador! (shared secret error)")
                     self.send_client_disconnect(ccj['src'])
                     del self.peers[ccj['src']]
+                    return
+            self.peers[ccj['src']].connection_state = 200
+            print "connected phase 6"
+            self.peer_connected = ccj['src']
+            self.emit(self.signal, "Connected")
 
     def start_client_connect(self, dst, cipher_suite=1):
         if dst == self.peer_connected:
