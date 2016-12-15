@@ -338,25 +338,26 @@ class Server:
                     logging.warning("Connect message with unknown fields")
                     self.delClient(sender.socket)
                     return
-                else:
-                    if 'cert' not in cert_and_key.keys() or 'key' not in cert_and_key.keys() or 'key_sign' not in cert_and_key.keys():
-                        logging.warning("Connect message with missing fields")
-                        self.delClient(sender.socket)
-                        return
-                    # verify certificate
-                    if not verify_certificate(cert_and_key['cert']):
-                        logging.warning("Invalid certificate for user")
-                        self.delClient(sender.socket)
-                        return
-                    user_cc_pubkey = get_pubkey_from_cert(cert_and_key['cert'])
-                    sender.cc = True
-                    if not rsa_verify_with_public_key(cert_and_key['key_sign'], cert_and_key['key'], user_cc_pubkey,
-                                                               pad=PADDING_PKCS1, hash_alg=SHA1):
-                        logging.warning("Invalid signature in user")
-                        self.delClient(sender.socket)
-                        return
-                    sender.pub_key = rsa_public_pem_to_key(str(cert_and_key['key']))
-                    self.connect_phase3(sender, request)
+                if 'cert' not in cert_and_key.keys() or 'key' not in cert_and_key.keys() or 'key_sign' not in cert_and_key.keys():
+                    logging.warning("Connect message with missing fields")
+                    self.delClient(sender.socket)
+                    return
+                # verify certificate
+                if not verify_certificate(cert_and_key['cert']):
+                    logging.warning("Invalid certificate for user")
+                    self.delClient(sender.socket)
+                    return
+                user_cc_pubkey = get_pubkey_from_cert(cert_and_key['cert'])
+                sender.name = get_info_from_cert(cert_and_key['cert'], label="CN")
+                sender.id = get_info_from_cert(cert_and_key['cert'], label="serialNumber")
+                sender.cc = True
+                if not rsa_verify_with_public_key(cert_and_key['key_sign'], cert_and_key['key'], user_cc_pubkey,
+                                                  pad=PADDING_PKCS1, hash_alg=SHA1):
+                    logging.warning("Invalid signature in user")
+                    self.delClient(sender.socket)
+                    return
+                sender.pub_key = rsa_public_pem_to_key(str(cert_and_key['key']))
+                self.connect_phase3(sender, request)
 
         elif sender.level == 2 and request['phase'] == 5:
             print "LEVEL 2 \n\n"
@@ -364,6 +365,16 @@ class Server:
                 logging.warning("Missing fields")
                 self.delClient(sender.socket)
                 return
+            if sender.cc:
+                if 'sign' not in request.keys():
+                    logging.warning("Missing fields")
+                    self.delClient(sender.socket)
+                    return
+                if not rsa_verify_with_public_key(request['sign'], request['id'] + request['ciphers'] + request['data'],
+                                                  sender.pub_key):
+                    logging.warning("INVALID SIGNATURE")
+                    self.delClient(sender.socket)
+                    return
             self.connect_phase5(sender, request)
 
     def processList(self, sender):
@@ -462,7 +473,7 @@ class Server:
             to_send = encrypt_with_symmetric(get_hash(bytes(str(request['id']) + request['data'])), sender.sa_data)
             to_send = base64.encodestring(to_send)
         elif sender.cipher_suite == SUPPORTED_CIPHER_SUITES[1]:
-            peer_key = rsa_public_pem_to_key(base64.decodestring(request['data']))
+            peer_key = rsa_public_pem_to_key(str(request['data']))
             sender.sa_data = ecdh_get_shared_secret(sender.sa_data, peer_key)
             to_send = "ok ecdh done"
         else:
@@ -471,7 +482,7 @@ class Server:
             return
         msg = {'type': 'connect', 'phase': request['phase'] + 1, 'id': get_nonce(),
                'ciphers': sender.cipher_suite, 'data': to_send}
-        #msg['sign']
+        msg['sign'] = sign_data(msg['id'] + msg['ciphers'] + msg['data'])
         sender.send(msg)
         sender.level = 200
         sender.setState(STATE_CONNECTED)

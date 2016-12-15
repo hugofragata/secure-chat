@@ -88,13 +88,13 @@ class security:
             raise security_error
         signer = private_key.signer(
             padding.PSS(
-                mgf = padding.MGF1(hashes.SHA256()),
-                salt_length = padding.PSS.MAX_LENGTH),
+                mgf=padding.MGF1(hashes.SHA256()),
+                salt_length=padding.PSS.MAX_LENGTH),
                 hashes.SHA256())
         message = str(text)
         signer.update(message)
         signature = signer.finalize()
-        return signature
+        return base64.encodestring(signature)
 
     def rsa_verify_with_public_key(self, signature, message, public_key, pad=PADDING_PSS, hash_alg=SHA2):
         '''

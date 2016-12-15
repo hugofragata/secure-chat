@@ -193,20 +193,19 @@ class ConnectionManager(QtCore.QThread):
 
             if req['ciphers'] not in SUPPORTED_CIPHER_SUITES:
                 print "ERROR connecting to server"
-                msg = {'type': 'connect', 'phase': req['phase'] + 1, 'name': self.user.name, 'id': time.time(),
+                msg = {'type': 'connect', 'phase': req['phase'] + 1, 'name': self.user.name, 'id': self.sec.get_nonce(),
                        'ciphers': req['ciphers'], 'data': 'not supported'}
                 self.send_message(json.dumps(msg))
-                self.user.connection_state = 1
                 return
             self.user.cipher_suite = req['ciphers']
             if self.user.ccauth:
                 self.user.priv_key, self.user.pub_key = self.sec.rsa_gen_key_pair()
                 pubkey_pem = self.sec.rsa_public_key_to_pem(self.user.pub_key)
                 data = {'cert': self.user.get_certificate(), 'key_sign': self.user.sign(pubkey_pem), 'key': pubkey_pem}
-                msg = {'type': 'connect', 'phase': req['phase'] + 1, 'name': self.user.name, 'id': time.time(),
+                msg = {'type': 'connect', 'phase': req['phase'] + 1, 'name': self.user.name, 'id': self.sec.get_nonce(),
                        'ciphers': self.user.cipher_suite, 'data': json.dumps(data)}
             else:
-                msg = {'type': 'connect', 'phase': req['phase'] + 1, 'name': self.user.name, 'id': time.time(),
+                msg = {'type': 'connect', 'phase': req['phase'] + 1, 'name': self.user.name, 'id': self.sec.get_nonce(),
                        'ciphers': self.user.cipher_suite, 'data': 'ok b0ss'}
             self.send_message(json.dumps(msg))
             self.user.connection_state += 1
@@ -224,26 +223,31 @@ class ConnectionManager(QtCore.QThread):
                 self.user.sa_data = self.sec.generate_key_symmetric()
                 to_send = self.sec.rsa_encrypt_with_public_key(self.user.sa_data, server_pubkey)
                 to_send = base64.encodestring(to_send)
-                msg = {'type': 'connect', 'phase': req['phase'] + 1, 'name': self.user.name, 'id': time.time(),
+                msg = {'type': 'connect', 'phase': req['phase'] + 1, 'name': self.user.name, 'id': self.sec.get_nonce(),
                        'ciphers': self.user.cipher_suite, 'data': to_send}
-                self.send_message(json.dumps(msg))
-                self.user.connection_state += 1
                 self.connect_check = self.sec.get_hash(bytes(str(msg['id']) + msg['data']))
             elif self.user.cipher_suite == SUPPORTED_CIPHER_SUITES[1]:
                 priv_key, pub_key = self.sec.ecdh_gen_key_pair()
-                msg = {'type': 'connect', 'phase': req['phase'] + 1, 'name': self.user.name, 'id': time.time(),
+                msg = {'type': 'connect', 'phase': req['phase'] + 1, 'name': self.user.name, 'id': self.sec.get_nonce(),
                        'ciphers': self.user.cipher_suite,
-                       'data': base64.encodestring(self.sec.rsa_public_key_to_pem(pub_key))}
+                       'data': self.sec.rsa_public_key_to_pem(pub_key)}
                 peer_key = self.sec.rsa_public_pem_to_key(base64.decodestring(req['data']))
                 self.user.sa_data = self.sec.ecdh_get_shared_secret(priv_key, peer_key)
                 del priv_key
-                self.send_message(json.dumps(msg))
-                self.user.connection_state += 1
+            else:
+                return
+            if self.user.ccauth:
+                msg['sign'] = self.sec.rsa_sign_with_private_key(msg['id'] + msg['ciphers'] + msg['data'], self.user.priv_key)
+            self.send_message(json.dumps(msg))
+            self.user.connection_state += 1
 
         if req['phase'] == 6:
             if self.user.connection_state != 4:
                 return
-            if len(req['data']) == 0:
+            if len(req['data']) == 0 or len(req['sign']) == 0:
+                return
+            if not self.sec.rsa_verify_with_public_key(req['sign'], req['id']+req['ciphers']+req['data'], self.server_pubkey):
+                print "ERROR in server msg"
                 return
             if self.user.cipher_suite == SUPPORTED_CIPHER_SUITES[0]:
                 check = self.sec.decrypt_with_symmetric(base64.decodestring(req['data']), self.user.sa_data)
@@ -381,11 +385,11 @@ class ConnectionManager(QtCore.QThread):
                 self.send_client_disconnect(ccj['src'])
                 return
             if ccj['ciphers'][0] in SUPPORTED_CIPHER_SUITES:
-                msg = json.dumps({"type": "client-connect", 'id': time.time(), "src": self.user.id, "dst": ccj['src'], "phase": 2, "ciphers": ccj['ciphers'][0],
+                msg = json.dumps({"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": ccj['src'], "phase": 2, "ciphers": ccj['ciphers'][0],
                               "data": self.user.name})
             elif ccj['ciphers'][1] in SUPPORTED_CIPHER_SUITES:
                 msg = json.dumps(
-                    {"type": "client-connect", 'id': time.time(), "src": self.user.id, "dst": ccj['src'], "phase": 2,
+                    {"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": ccj['src'], "phase": 2,
                      "ciphers": ccj['ciphers'][1],
                      "data": self.user.name})
             else:
@@ -409,11 +413,11 @@ class ConnectionManager(QtCore.QThread):
                 return
             if ccj['ciphers'] not in SUPPORTED_CIPHER_SUITES:
                 self.emit(self.error_signal, "Erro a ligar ao utilizador! (Unsupported cipher suite)")
-                msg = json.dumps({"type": "client-connect", 'id': time.time(), "src": self.user.id, "dst": ccj['src'], "phase": 3, "ciphers": ccj['ciphers'],
+                msg = json.dumps({"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": ccj['src'], "phase": 3, "ciphers": ccj['ciphers'],
                               "data": "not supported"})
                 del self.peers[ccj['src']]
             else:
-                msg = json.dumps({"type": "client-connect", 'id': time.time(), "src": self.user.id, "dst": ccj['src'], "phase": 3, "ciphers": ccj['ciphers'],
+                msg = json.dumps({"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": ccj['src'], "phase": 3, "ciphers": ccj['ciphers'],
                               "data": "ok b0ss"})
                 self.peers[ccj['src']].cipher_suite = ccj['ciphers']
                 self.peers[ccj['src']].connection_state = 3
@@ -439,7 +443,7 @@ class ConnectionManager(QtCore.QThread):
                 self.peers[ccj['src']].sa_data = priv_key
                 priv_key = ""
                 msg = json.dumps(
-                    {"type": "client-connect", 'id': time.time(), "src": self.user.id, "dst": ccj['src'], "phase": 4,
+                    {"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": ccj['src'], "phase": 4,
                      "ciphers": ccj['ciphers'],
                      "data": base64.encodestring(self.sec.rsa_public_key_to_pem(pub_key))})
                 ciphered_pl = base64.encodestring(self.sec.encrypt_with_symmetric(msg, self.user.sa_data))
@@ -451,7 +455,7 @@ class ConnectionManager(QtCore.QThread):
                 self.peers[ccj['src']].sa_data = priv_key
                 del priv_key
                 msg = json.dumps(
-                    {"type": "client-connect", 'id': time.time(), "src": self.user.id, "dst": ccj['src'], "phase": 4,
+                    {"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": ccj['src'], "phase": 4,
                      "ciphers": ccj['ciphers'],
                      "data": base64.encodestring(self.sec.rsa_public_key_to_pem(pub_key))})
                 ciphered_pl = base64.encodestring(self.sec.encrypt_with_symmetric(msg, self.user.sa_data))
@@ -479,7 +483,7 @@ class ConnectionManager(QtCore.QThread):
                 self.peers[ccj['src']].sa_data = self.sec.generate_key_symmetric()
                 to_send = self.sec.rsa_encrypt_with_public_key(self.peers[ccj['src']].sa_data, user_pubkey)
                 to_send = base64.encodestring(to_send)
-                msg = {"type": "client-connect", 'id': time.time(), "src": self.user.id, "dst": ccj['src'], "phase": 5,
+                msg = {"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": ccj['src'], "phase": 5,
                      "ciphers": ccj['ciphers'],
                      "data": to_send}
                 ciphered_pl = base64.encodestring(self.sec.encrypt_with_symmetric(json.dumps(msg), self.user.sa_data))
@@ -492,7 +496,7 @@ class ConnectionManager(QtCore.QThread):
                 peer_key = self.sec.rsa_public_pem_to_key(base64.decodestring(ccj['data']))
                 self.peers[ccj['src']].sa_data = self.sec.ecdh_get_shared_secret(priv_key, peer_key)
                 del priv_key
-                msg = {"type": "client-connect", 'id': time.time(), "src": self.user.id, "dst": ccj['src'], "phase": 5,
+                msg = {"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": ccj['src'], "phase": 5,
                        "ciphers": ccj['ciphers'],
                        "data": base64.encodestring(self.sec.rsa_public_key_to_pem(pub_key))}
                 ciphered_pl = base64.encodestring(self.sec.encrypt_with_symmetric(json.dumps(msg), self.user.sa_data))
@@ -518,7 +522,7 @@ class ConnectionManager(QtCore.QThread):
                     self.sec.get_hash(bytes(str(ccj['id']) + ccj['data'])), self.peers[ccj['src']].sa_data)
                 to_send = base64.encodestring(to_send)
                 msg = json.dumps(
-                    {"type": "client-connect", 'id': time.time(), "src": self.user.id, "dst": ccj['src'], "phase": 6,
+                    {"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": ccj['src'], "phase": 6,
                      "ciphers": ccj['ciphers'],
                      "data": to_send})
                 ciphered_pl = base64.encodestring(self.sec.encrypt_with_symmetric(msg, self.user.sa_data))
@@ -532,7 +536,7 @@ class ConnectionManager(QtCore.QThread):
                 self.peers[ccj['src']].sa_data = self.sec.ecdh_get_shared_secret(
                     self.peers[ccj['src']].sa_data, peer_key)
                 msg = json.dumps(
-                    {"type": "client-connect", 'id': time.time(), "src": self.user.id, "dst": ccj['src'], "phase": 6,
+                    {"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": ccj['src'], "phase": 6,
                      "ciphers": ccj['ciphers'],
                      "data": "ok ecdh done"})
                 ciphered_pl = base64.encodestring(self.sec.encrypt_with_symmetric(msg, self.user.sa_data))
@@ -596,11 +600,11 @@ class ConnectionManager(QtCore.QThread):
             # if cipher_suite == 2 ECDH
             if cipher_suite == 1:
                 msg = json.dumps(
-                    {"type": "client-connect", 'id': time.time(), "src": self.user.id, "dst": dst, "phase": 1,
+                    {"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": dst, "phase": 1,
                      "ciphers": SUPPORTED_CIPHER_SUITES, "data": self.user.name})
             else:
                 msg = json.dumps(
-                    {"type": "client-connect", 'id': time.time(), "src": self.user.id, "dst": dst, "phase": 1,
+                    {"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": dst, "phase": 1,
                      "ciphers": [SUPPORTED_CIPHER_SUITES[1], SUPPORTED_CIPHER_SUITES[0], SUPPORTED_CIPHER_SUITES[2]],
                      "data": self.user.name})
             ciphered_pl = self.sec.encrypt_with_symmetric(msg, self.user.sa_data)
@@ -614,7 +618,7 @@ class ConnectionManager(QtCore.QThread):
             del self.peers[peer]
         if self.peer_connected == peer:
             self.peer_connected = None
-        msg = json.dumps({"type": "client-disconnect", 'id': time.time(), "src": self.user.id, "dst": peer})
+        msg = json.dumps({"type": "client-disconnect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": peer})
         ciphered_pl = self.sec.encrypt_with_symmetric(msg, self.user.sa_data)
         ciphered_pl = base64.encodestring(ciphered_pl)
         secure_msg = {'type': 'secure', 'sa-data': 'aa', 'payload': ciphered_pl}
@@ -662,6 +666,7 @@ class ConnectionManager(QtCore.QThread):
             return None
         return json.dumps(
             {"type": "connect", "phase": int(phase), "name": name, "id": id, "ciphers": ciphers, "data": data, "nonce": self.sec.get_nonce()})
+
 
 class ConnectionManagerError(Exception):
     pass

@@ -252,3 +252,19 @@ def get_hash(text):
 
 def get_nonce(length=16):
     return ''.join([str(random.SystemRandom().randint(0, 9)) for i in range(length)])
+
+
+def get_info_from_cert(cert, label=None):
+    '''
+    Get information from the certificate
+    :param cert: the certificate in PEM
+    :param label:
+    :return:
+    '''
+    cer = crypto.load_certificate(crypto.FILETYPE_PEM, cert)
+    subj = cer.get_subject()
+    if label is None:
+        return subj.get_components()
+    for l in subj.get_components():
+        if l[0] == label:
+            return l[1]
