@@ -1,4 +1,4 @@
-# encoding: utf-8
+
 #
 # jpbarraca@ua.pt
 # jmr@ua.pt 2016
@@ -348,8 +348,11 @@ class Server:
                     self.delClient(sender.socket)
                     return
                 user_cc_pubkey = get_pubkey_from_cert(cert_and_key['cert'])
-                sender.name = get_info_from_cert(cert_and_key['cert'], label="CN")
-                sender.id = get_info_from_cert(cert_and_key['cert'], label="serialNumber")
+                if sender.name != unicode(get_info_from_cert(cert_and_key['cert'], label="CN"), "utf-8") or sender.id != unicode(get_info_from_cert(cert_and_key['cert'], label="serialNumber"), "utf-8"):
+                    logging.warning("User trying to login with a different name or id: " + sender.name)
+                    self.delClient(sender.socket)
+                    return
+
                 sender.cc = True
                 if not rsa_verify_with_public_key(cert_and_key['key_sign'], cert_and_key['key'], user_cc_pubkey,
                                                   pad=PADDING_PKCS1, hash_alg=SHA1):
@@ -498,8 +501,6 @@ class Server:
         :type client: Client
         :return:  base64 encoded payload ready to send
         '''
-        #payload = json.dumps({'sign': sign_data(msg), 'data': msg})
-        # payload = json.dumps({'sign': "Tl9ogFxkVJXRCc5vUbXB242L+o3t7rchy5HBTJE1oGikXfMdik1gHdy6r8OBOTFXCCrtTm7sR4jg\nv7d0MQf/jtNcTc4Qb2Ac7ZXoamR3Xdzvz670kUB3iwSJUSW8ZhIuE19MXuZH06c24DpsWos9NaoC\nyePe4/9U9N9ljD79jT3cY7s392/JBMkeSDhwekI5STkD7k4LcXNyIiKw3ZhpXafxz3iOSQcBTrEe\nLrU7pARK9nrnwPmaQC9jXtiFyh808dAZdPFKQ8i0zBHhz6G/fjoA6X6xjzJtfDZk5hC4X2dlM4x+\nqP3+hImyM0QffmbJVtW/YqWFaPO+NJjtaAse6A==\n", 'data': msg})
         c_payload = base64.encodestring(encrypt_with_symmetric(msg, client.sa_data))
         dst_message = {'type': 'secure', 'sa-data': 'not used', 'payload': c_payload}
         client.send(dst_message)
