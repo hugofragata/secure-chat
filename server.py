@@ -102,6 +102,30 @@ class Client:
 
         logging.info("Client Closed")
 
+    def permission_to_write(self, other):
+        '''
+        Permissions in Bell Lapadula. Clients with Portuguese CC are higher in the hierarchy.
+        This function says if the SELF client can WRITE to the OTHER client
+        if SELF is higher than OTHER then refuse write
+        :param other: Other Client instance
+        :return: Boolean
+        '''
+        if self.cc and not other.cc:
+            return False
+        return True
+
+    def permission_to_read(self, other):
+        '''
+        Permissions in Bell Lapadula. Clients with Portuguese CC are higher in the hierarchy.
+        This function says if the SELF client can WRITE to the OTHER client
+        if SELF is lower than OTHER then refuse write
+        :param other: Other Client instance
+        :return: Boolean
+        '''
+        if not self.cc and other.cc:
+            return False
+        return True
+
 
 class ChatError(Exception):
     """This exception should signal a protocol error in a client request.
@@ -392,12 +416,9 @@ class Server:
             return
 
         filtered_client_list = []
-        if not sender.cc:
-            for client in self.clients:
-                if not self.clients[client].cc:
-                    filtered_client_list.append(self.clients[client].asDict())
-        else:
-            filtered_client_list = self.clientList()
+        for client in self.clients:
+            if sender.permission_to_read(self.clients[client]):
+                filtered_client_list.append(self.clients[client].asDict())
 
         data = json.dumps({'type': 'list', 'data': filtered_client_list})
         self.send_secure(data, sender)
@@ -445,7 +466,7 @@ class Server:
             return
 
         dst = self.id2client[payload_json['dst']]
-        if not dst.cc and sender.cc:
+        if not sender.permission_to_write(dst) or not dst.permission_to_read(sender):
             return
         self.send_secure(plainText_payload, dst)
         # pl_to_user = json.dumps({'sign': sign_data(plainText_payload), 'data': plainText_payload})
