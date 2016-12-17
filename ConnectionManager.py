@@ -375,9 +375,12 @@ class ConnectionManager(QtCore.QThread):
             print "already connected"
             return
         if ccj['phase'] == 1:
+            print "phase 1 \n\n\n\n\n\n\n\n"
+            print ccj
             if ccj['src'] not in self.peers:
                 self.peers[ccj['src']] = User(ccj['data'], uid=ccj['src'])
             elif self.peers[ccj['src']].connection_state != 1:
+                print "----------------------------------------state"
                 del self.peers[ccj['src']]
                 self.send_client_disconnect(ccj['src'])
                 return
@@ -391,7 +394,7 @@ class ConnectionManager(QtCore.QThread):
                 return
             if self.user.ccauth:
                 pubkey_pem = self.sec.rsa_public_key_to_pem(self.user.pub_key)
-                data = {'cert': self.user.get_certificate(), 'key': pubkey_pem, 'key_sign': self.user.sign(pubkey_pem)}
+                data = json.dumps({'cert': self.user.get_certificate(), 'key': pubkey_pem, 'key_sign': self.user.sign(pubkey_pem)})
             else:
                 data = self.user.name
             self.send_client_connect(data, ccj, 2, ci)
@@ -404,6 +407,8 @@ class ConnectionManager(QtCore.QThread):
             self.peers[ccj['src']].connection_state = 2
 
         elif ccj['phase'] == 2:
+            print "phase 2 \n\n\n\n\n\n\n\n"
+            print ccj
             if ccj['src'] not in self.peers:
                 self.emit(self.error_signal, "Erro a ligar ao utilizador!")
                 self.send_client_disconnect(ccj['src'])
@@ -422,8 +427,8 @@ class ConnectionManager(QtCore.QThread):
             except:
                 if self.user.ccauth:
                     pubkey_pem = self.sec.rsa_public_key_to_pem(self.user.pub_key)
-                    data = {'cert': self.user.get_certificate(), 'key': pubkey_pem,
-                            'key_sign': self.user.sign(pubkey_pem)}
+                    data = json.dumps({'cert': self.user.get_certificate(), 'key': pubkey_pem,
+                                       'key_sign': self.user.sign(pubkey_pem)})
                 self.peers[ccj['src']].cipher_suite = ccj['ciphers']
                 self.peers[ccj['src']].connection_state = 3
             else:
@@ -437,8 +442,8 @@ class ConnectionManager(QtCore.QThread):
                 self.peers[ccj['src']].pub_key = self.sec.rsa_public_pem_to_key(str(cert_and_key['key']))
                 if self.user.ccauth:
                     pubkey_pem = self.sec.rsa_public_key_to_pem(self.user.pub_key)
-                    data = {'cert': self.user.get_certificate(), 'key': pubkey_pem,
-                            'key_sign': self.user.sign(pubkey_pem)}
+                    data = json.dumps({'cert': self.user.get_certificate(), 'key': pubkey_pem,
+                                       'key_sign': self.user.sign(pubkey_pem)})
                 self.peers[ccj['src']].cipher_suite = ccj['ciphers']
                 self.peers[ccj['src']].connection_state = 3
             self.send_client_connect(data, ccj, 3, ccj['ciphers'])
