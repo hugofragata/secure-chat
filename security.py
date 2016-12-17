@@ -107,9 +107,10 @@ class security:
         :return: True case valid or False case invalid
         '''
         if not signature or not public_key:
+            print "No passed args"
             raise security_error
         if not isinstance(public_key, rsa.RSAPublicKey):
-            raise security_error
+            public_key = self.rsa_public_pem_to_key(public_key)
         signature = str(base64.decodestring(signature))
         mes = str(unicode(message))
         verifier = public_key.verifier(
@@ -120,7 +121,6 @@ class security:
         try:
             verifier.verify()
         except:
-
             return False
         else:
             return True
