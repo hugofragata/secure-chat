@@ -455,6 +455,8 @@ class ConnectionManager(QtCore.QThread):
             # self.send_message(json.dumps(secure_msg))
 
         elif ccj['phase'] == 3:
+            print "phase 3 \n\n\n\n\n\n\n\n"
+            print ccj
             if ccj['src'] not in self.peers:
                 self.send_client_disconnect(ccj['src'])
                 return
@@ -494,6 +496,8 @@ class ConnectionManager(QtCore.QThread):
             self.peers[ccj['src']].connection_state = 3
 
         elif ccj['phase'] == 4:
+            print "phase 4 \n\n\n\n\n\n\n\n"
+            print ccj
             if ccj['src'] not in self.peers:
                 self.emit(self.error_signal, "Erro a ligar ao utilizador!")
                 self.send_client_disconnect(ccj['src'])
@@ -654,10 +658,13 @@ class ConnectionManager(QtCore.QThread):
             return None
 
     def send_client_connect(self, data, req, phase, ci):
+        print type(data)
         msg = json.dumps(
             {"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": req['src'],
              "phase": phase, "ciphers": ci, "data": data})
-        ciphered_pl = base64.encodestring(self.sec.encrypt_with_symmetric(msg, self.user.sa_data))
+        print msg
+        print type(msg)
+        ciphered_pl = base64.encodestring(self.sec.encrypt_with_symmetric(str(msg), self.user.sa_data))
         secure_msg = {'type': 'secure', 'sa-data': 'aa', 'payload': ciphered_pl}
         self.send_message(json.dumps(secure_msg))
 
@@ -756,13 +763,13 @@ class ConnectionManager(QtCore.QThread):
 
     def verify_connecting_user(self, user, json):
         u_name = user.name
-        cert = json['cert']
+        cert = str(json['cert'])
         j_pub_key = json['key']
         c_pub_key = self.sec.get_pubkey_from_cert(cert)
         c_name = self.sec.get_name_from_cert(cert)
         signature = json['key_sign']
         #verificar nome
-        c_name = unicode(c_name ,'utf-8')
+        c_name = unicode(c_name, 'utf-8')
         if not u_name == c_name:
             return False
         #verificar validade do cert
