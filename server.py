@@ -417,8 +417,10 @@ class Server:
 
         filtered_client_list = []
         for client in self.clients:
-            if sender.permission_to_read(self.clients[client]):
-                filtered_client_list.append(self.clients[client].asDict())
+            filtered_client_list.append(self.clients[client].asDict())
+
+            #if sender.permission_to_read(self.clients[client]):
+            #    filtered_client_list.append(self.clients[client].asDict())
 
         data = json.dumps({'type': 'list', 'data': filtered_client_list})
         self.send_secure(data, sender)
