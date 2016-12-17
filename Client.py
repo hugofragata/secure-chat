@@ -110,8 +110,12 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
             self.diag_ui.userName.setDisabled(False)
 
     def append_self_msg(self, msg, id):
-        self.messages.append([msg, id, False])
-        self.textBrowser.append("<span><p style=\"color:red\">(eu)> " + msg + "</p><span>")
+        if msg == QtCore.QString.fromLatin1("/top", len("/top")):
+            self.messages.append(["<p><img src=\"a.png\"/></p>", id, False])
+            self.textBrowser.append("<p style=\"color:red\">(eu)> " + "<p><img src=\"a.png\"/></p>" + "</p>")
+        else:
+            self.messages.append([msg, id, False])
+            self.textBrowser.append("<span><p style=\"color:red\">(eu)> " + msg + "</p><span>")
 
     def append_id(self, id, recieved):
         self.textBrowser.clear()
@@ -162,8 +166,12 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
         self.setWindowTitle("I am " + QtCore.QString.fromLatin1(self.comm.user.name, len(self.comm.user.name)) + ", talking to " + item.user_name)
 
     def updateChat(self, text):
-        self.messages.append([text, self.comm.peers[self.comm.peer_connected].name, None])
-        self.textBrowser.append("<span><p>" + self.comm.peers[self.comm.peer_connected].name + "> " + QtCore.QString.fromLatin1(text, len(text)) + "</p></span>")
+        if repr(text) == repr('/\x00t\x00o\x00p\x00'):
+            self.messages.append([self.comm.peers[self.comm.peer_connected].name + "> <p><img src=\"a.png\"/></p>", self.comm.peers[self.comm.peer_connected].name, None])
+            self.textBrowser.append(self.comm.peers[self.comm.peer_connected].name + "> <p><img src=\"a.png\"/></p>")
+        else:
+            self.messages.append([text, self.comm.peers[self.comm.peer_connected].name, None])
+            self.textBrowser.append("<span><p>" + self.comm.peers[self.comm.peer_connected].name + "> " + QtCore.QString.fromLatin1(text, len(text)) + "</p></span>")
 
     def show_error(self, error):
         errorDiag = QtGui.QMessageBox()
