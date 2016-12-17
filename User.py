@@ -12,6 +12,8 @@ class User:
         self.cipher_suite = None
         self.conn_check = None
         self.buffin = ""
+        self.pub_key = None
+        self.ccauth = False
         self.waiting_acks = []
 
 
@@ -30,7 +32,6 @@ class SuperUser(User):
             self.ccauth = False
             self.name = name
             self.id = time.time()
-        self.pub_key = None
         self.priv_key = None
 
     def sign(self, data):

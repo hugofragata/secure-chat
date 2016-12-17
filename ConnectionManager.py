@@ -382,19 +382,25 @@ class ConnectionManager(QtCore.QThread):
                 self.send_client_disconnect(ccj['src'])
                 return
             if ccj['ciphers'][0] in SUPPORTED_CIPHER_SUITES:
-                msg = json.dumps({"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": ccj['src'],
-                                  "phase": 2, "ciphers": ccj['ciphers'][0], "data": self.user.name})
+                ci = ccj['ciphers'][0]
             elif ccj['ciphers'][1] in SUPPORTED_CIPHER_SUITES:
-                msg = json.dumps(
-                    {"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": ccj['src'], "phase": 2,
-                     "ciphers": ccj['ciphers'][1], "data": self.user.name})
+                ci = ccj['ciphers'][1]
             else:
                 del self.peers[ccj['src']]
                 self.send_client_disconnect(ccj['src'])
                 return
-            ciphered_pl = base64.encodestring(self.sec.encrypt_with_symmetric(msg, self.user.sa_data))
-            secure_msg = {'type': 'secure', 'sa-data': 'aa', 'payload': ciphered_pl}
-            self.send_message(json.dumps(secure_msg))
+            if self.user.ccauth:
+                pubkey_pem = self.sec.rsa_public_key_to_pem(self.user.pub_key)
+                data = {'cert': self.user.get_certificate(), 'key': pubkey_pem, 'key_sign': self.user.sign(pubkey_pem)}
+            else:
+                data = self.user.name
+            self.send_client_connect(data, ccj, 2, ci)
+            # msg = json.dumps(
+            #    {"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": ccj['src'],
+            #     "phase": 2, "ciphers": ci, "data": data})
+            # ciphered_pl = base64.encodestring(self.sec.encrypt_with_symmetric(msg, self.user.sa_data))
+            # secure_msg = {'type': 'secure', 'sa-data': 'aa', 'payload': ciphered_pl}
+            # self.send_message(json.dumps(secure_msg))
             self.peers[ccj['src']].connection_state = 2
 
         elif ccj['phase'] == 2:
@@ -408,18 +414,40 @@ class ConnectionManager(QtCore.QThread):
                 self.send_client_disconnect(ccj['src'])
                 return
             if ccj['ciphers'] not in SUPPORTED_CIPHER_SUITES:
-                self.emit(self.error_signal, "Erro a ligar ao utilizador! (Unsupported cipher suite)")
-                msg = json.dumps({"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": ccj['src'], "phase": 3,
-                                  "ciphers": ccj['ciphers'], "data": "not supported"})
-                del self.peers[ccj['src']]
-            else:
-                msg = json.dumps({"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": ccj['src'], "phase": 3,
-                                  "ciphers": ccj['ciphers'], "data": "ok b0ss"})
+                self.error_client_connect_phase2(ccj['src'], ccj, "Unsupported cipher suite")
+                return
+            data = "ok b0ss"
+            try:
+                cert_and_key = json.loads(ccj['data'])
+            except:
+                if self.user.ccauth:
+                    pubkey_pem = self.sec.rsa_public_key_to_pem(self.user.pub_key)
+                    data = {'cert': self.user.get_certificate(), 'key': pubkey_pem,
+                            'key_sign': self.user.sign(pubkey_pem)}
                 self.peers[ccj['src']].cipher_suite = ccj['ciphers']
                 self.peers[ccj['src']].connection_state = 3
-            ciphered_pl = base64.encodestring(self.sec.encrypt_with_symmetric(msg, self.user.sa_data))
-            secure_msg = {'type': 'secure', 'sa-data': 'aa', 'payload': ciphered_pl}
-            self.send_message(json.dumps(secure_msg))
+            else:
+                if not all(k in cert_and_key.keys() for k in ("cert", "key", "key_sign")):
+                    self.error_client_connect_phase2(ccj['src'], ccj, "Erro a ligar ao utilizador! (Missing fields)")
+                    return
+                if not self.verify_connecting_user(self.peers[ccj['src']], cert_and_key):
+                    self.error_client_connect_phase2(ccj['src'], ccj, "Erro a ligar ao utilizador! (Invalid certificate)")
+                    return
+                self.peers[ccj['src']].ccauth = True
+                self.peers[ccj['src']].pub_key = self.sec.rsa_public_pem_to_key(str(cert_and_key['key']))
+                if self.user.ccauth:
+                    pubkey_pem = self.sec.rsa_public_key_to_pem(self.user.pub_key)
+                    data = {'cert': self.user.get_certificate(), 'key': pubkey_pem,
+                            'key_sign': self.user.sign(pubkey_pem)}
+                self.peers[ccj['src']].cipher_suite = ccj['ciphers']
+                self.peers[ccj['src']].connection_state = 3
+            self.send_client_connect(data, ccj, 3, ccj['ciphers'])
+            # msg = json.dumps(
+            #    {"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": ccj['src'],
+            #     "phase": 3, "ciphers": ccj['ciphers'], "data": data})
+            # ciphered_pl = base64.encodestring(self.sec.encrypt_with_symmetric(msg, self.user.sa_data))
+            # secure_msg = {'type': 'secure', 'sa-data': 'aa', 'payload': ciphered_pl}
+            # self.send_message(json.dumps(secure_msg))
 
         elif ccj['phase'] == 3:
             if ccj['src'] not in self.peers:
@@ -429,29 +457,32 @@ class ConnectionManager(QtCore.QThread):
                 del self.self.peers[ccj['src']]
                 self.send_client_disconnect(ccj['src'])
                 return
-            if ccj['data'] != "ok b0ss":
+            if ccj['data'] == "not supported":
                 del self.self.peers[ccj['src']]
                 self.send_client_disconnect(ccj['src'])
                 return
-            self.peers[ccj['src']].cipher_suite = ccj['ciphers']
-            if self.peers[ccj['src']].cipher_suite == SUPPORTED_CIPHER_SUITES[0]:
-                priv_key, pub_key = self.sec.rsa_gen_key_pair()
-                self.peers[ccj['src']].sa_data = priv_key
-                del priv_key
-                msg = json.dumps(
-                    {"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": ccj['src'], "phase": 4,
-                     "ciphers": ccj['ciphers'],
-                     "data": base64.encodestring(self.sec.rsa_public_key_to_pem(pub_key))})
-            elif ccj['ciphers'] == SUPPORTED_CIPHER_SUITES[1]:
-                priv_key, pub_key = self.sec.ecdh_gen_key_pair()
-                self.peers[ccj['src']].sa_data = priv_key
-                del priv_key
-                msg = json.dumps(
-                    {"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": ccj['src'], "phase": 4,
-                     "ciphers": ccj['ciphers'],
-                     "data": base64.encodestring(self.sec.rsa_public_key_to_pem(pub_key))})
+            if ccj['data'] == "ok b0ss":
+                data = self.client_connect_phase3(ccj)
             else:
-                return
+                try:
+                    cert_and_key = json.loads(ccj['data'])
+                except:
+                    del self.self.peers[ccj['src']]
+                    self.send_client_disconnect(ccj['src'])
+                    return
+                if not self.verify_connecting_user(self.self.peers[ccj['src']], cert_and_key):
+                    print "ERROR invalid certificate, phase 3"
+                    del self.self.peers[ccj['src']]
+                    self.send_client_disconnect(ccj['src'])
+                    return
+                self.peers[ccj['src']].ccauth = True
+                self.peers[ccj['src']].pub_key = self.sec.rsa_public_pem_to_key(str(cert_and_key['key']))
+                data = self.client_connect_phase3(ccj)
+            msg = {"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": ccj['src'],
+                   "phase": 4, "ciphers": ccj['ciphers'], "data": data}
+            if self.user.ccauth:
+                msg['sign'] = self.sec.rsa_sign_with_private_key(msg['id']+msg['dst']+msg['src']+msg['data'], self.user.priv_key)
+            msg = json.dumps(msg)
             ciphered_pl = base64.encodestring(self.sec.encrypt_with_symmetric(msg, self.user.sa_data))
             secure_msg = {'type': 'secure', 'sa-data': 'aa', 'payload': ciphered_pl}
             self.send_message(json.dumps(secure_msg))
@@ -472,6 +503,17 @@ class ConnectionManager(QtCore.QThread):
                 self.send_client_disconnect(ccj['src'])
                 del self.peers[ccj['src']]
                 return
+            if self.peers[ccj['src']].ccauth:
+                if 'sign' not in ccj.keys():
+                    self.emit(self.error_signal, "Erro a ligar ao utilizador! (Missing fields)")
+                    self.send_client_disconnect(ccj['src'])
+                    del self.peers[ccj['src']]
+                    return
+                if not self.sec.rsa_verify_with_public_key(ccj['sign'], ccj['id']+ccj['dst']+ccj['src']+ccj['data'], self.peers[ccj['src']].pub_key):
+                    self.emit(self.error_signal, "Erro a ligar ao utilizador! (Invalid signature)")
+                    self.send_client_disconnect(ccj['src'])
+                    del self.peers[ccj['src']]
+                    return
             if self.peers[ccj['src']].cipher_suite == SUPPORTED_CIPHER_SUITES[0]:
                 user_pubkey = self.sec.rsa_public_pem_to_key(base64.decodestring(ccj['data']))
                 self.peers[ccj['src']].sa_data = self.sec.generate_key_symmetric()
@@ -490,6 +532,8 @@ class ConnectionManager(QtCore.QThread):
                        "data": base64.encodestring(self.sec.rsa_public_key_to_pem(pub_key))}
             else:
                 return
+            if self.user.ccauth:
+                msg['sign'] = self.sec.rsa_sign_with_private_key(msg['id'] + msg['dst'] + msg['src'] + msg['data'], self.user.priv_key)
             ciphered_pl = base64.encodestring(self.sec.encrypt_with_symmetric(json.dumps(msg), self.user.sa_data))
             secure_msg = {'type': 'secure', 'sa-data': 'aa', 'payload': ciphered_pl}
             self.send_message(json.dumps(secure_msg))
@@ -507,6 +551,17 @@ class ConnectionManager(QtCore.QThread):
                 self.send_client_disconnect(ccj['src'])
                 del self.peers[ccj['src']]
                 return
+            if self.peers[ccj['src']].ccauth:
+                if 'sign' not in ccj.keys():
+                    self.emit(self.error_signal, "Erro a ligar ao utilizador! (Missing fields)")
+                    self.send_client_disconnect(ccj['src'])
+                    del self.peers[ccj['src']]
+                    return
+                if not self.sec.rsa_verify_with_public_key(ccj['sign'], ccj['id']+ccj['dst']+ccj['src']+ccj['data'], self.peers[ccj['src']].pub_key):
+                    self.emit(self.error_signal, "Erro a ligar ao utilizador! (Invalid signature)")
+                    self.send_client_disconnect(ccj['src'])
+                    del self.peers[ccj['src']]
+                    return
             if self.peers[ccj['src']].cipher_suite == SUPPORTED_CIPHER_SUITES[0]:
                 self.peers[ccj['src']].sa_data = self.sec.rsa_decrypt_with_private_key(base64.decodestring(ccj['data']), self.peers[ccj['src']].sa_data)
                 to_send = self.sec.encrypt_with_symmetric(
@@ -519,9 +574,12 @@ class ConnectionManager(QtCore.QThread):
                 to_send = "ok ecdh done"
             else:
                 return
-            msg = json.dumps({"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id,
-                              "dst": ccj['src'], "phase": 6, "ciphers": ccj['ciphers'], "data": to_send})
-            ciphered_pl = base64.encodestring(self.sec.encrypt_with_symmetric(msg, self.user.sa_data))
+            msg = {"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id,
+                   "dst": ccj['src'], "phase": 6, "ciphers": ccj['ciphers'], "data": to_send}
+            if self.user.ccauth:
+                msg['sign'] = self.sec.rsa_sign_with_private_key(msg['id'] + msg['dst'] + msg['src'] + msg['data'],
+                                                                 self.user.priv_key)
+            ciphered_pl = base64.encodestring(self.sec.encrypt_with_symmetric(json.dumps(msg), self.user.sa_data))
             secure_msg = {'type': 'secure', 'sa-data': 'aa', 'payload': ciphered_pl}
             self.send_message(json.dumps(secure_msg))
             self.peers[ccj['src']].connection_state = 200
@@ -543,6 +601,17 @@ class ConnectionManager(QtCore.QThread):
                 self.send_client_disconnect(ccj['src'])
                 del self.peers[ccj['src']]
                 return
+            if self.peers[ccj['src']].ccauth:
+                if 'sign' not in ccj.keys():
+                    self.emit(self.error_signal, "Erro a ligar ao utilizador! (Missing fields)")
+                    self.send_client_disconnect(ccj['src'])
+                    del self.peers[ccj['src']]
+                    return
+                if not self.sec.rsa_verify_with_public_key(ccj['sign'], ccj['id']+ccj['dst']+ccj['src']+ccj['data'], self.peers[ccj['src']].pub_key):
+                    self.emit(self.error_signal, "Erro a ligar ao utilizador! (Invalid signature)")
+                    self.send_client_disconnect(ccj['src'])
+                    del self.peers[ccj['src']]
+                    return
             if self.peers[ccj['src']].cipher_suite == SUPPORTED_CIPHER_SUITES[0]:
                 check = self.sec.decrypt_with_symmetric(base64.decodestring(ccj['data']), self.peers[ccj['src']].sa_data)
                 if check != self.peers[ccj['src']].conn_check:
@@ -561,6 +630,45 @@ class ConnectionManager(QtCore.QThread):
             print "connected phase 6"
             self.peer_connected = ccj['src']
             self.emit(self.signal, "Connected")
+
+    def client_connect_phase3(self, req):
+        self.peers[req['src']].cipher_suite = req['ciphers']
+        if self.peers[req['src']].cipher_suite == SUPPORTED_CIPHER_SUITES[0]:
+            priv_key, pub_key = self.sec.rsa_gen_key_pair()
+            self.peers[req['src']].sa_data = priv_key
+            del priv_key
+            data = base64.encodestring(self.sec.rsa_public_key_to_pem(pub_key))
+            return data
+        elif req['ciphers'] == SUPPORTED_CIPHER_SUITES[1]:
+            priv_key, pub_key = self.sec.ecdh_gen_key_pair()
+            self.peers[req['src']].sa_data = priv_key
+            del priv_key
+            data = base64.encodestring(self.sec.rsa_public_key_to_pem(pub_key))
+            return data
+        else:
+            return None
+
+    def send_client_connect(self, data, req, phase, ci):
+        msg = json.dumps(
+            {"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": req['src'],
+             "phase": phase, "ciphers": ci, "data": data})
+        ciphered_pl = base64.encodestring(self.sec.encrypt_with_symmetric(msg, self.user.sa_data))
+        secure_msg = {'type': 'secure', 'sa-data': 'aa', 'payload': ciphered_pl}
+        self.send_message(json.dumps(secure_msg))
+
+    def error_client_connect_phase2(self, sender, req, erro):
+        self.emit(self.error_signal, erro)
+        del self.peers[sender]
+        msg = json.dumps(
+            {"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": sender,
+             "phase": 3, "ciphers": req['ciphers'], "data": "not supported"})
+        ciphered_pl = base64.encodestring(self.sec.encrypt_with_symmetric(msg, self.user.sa_data))
+        secure_msg = {'type': 'secure', 'sa-data': 'aa', 'payload': ciphered_pl}
+        self.send_message(json.dumps(secure_msg))
+
+    def verify_connecting_user(self, user, data):
+        if not self.sec.verify_certificate(data['cert']):
+            return False
 
     def start_client_connect(self, dst, cipher_suite=1):
         if dst == self.peer_connected:

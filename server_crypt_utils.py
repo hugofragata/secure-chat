@@ -50,7 +50,7 @@ def get_certificate():
     ).serial_number(
         utils.int_from_bytes(os.urandom(20), "big") >> 1  # to support older versions of cryptography
     ).not_valid_before(
-        datetime.datetime.utcnow()
+        datetime.datetime.utcnow() - datetime.timedelta(hours=1)
     ).not_valid_after(
         datetime.datetime.utcnow() + datetime.timedelta(days=10)
     ).add_extension(

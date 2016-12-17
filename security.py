@@ -171,12 +171,9 @@ class security:
 
         # Create and fill a X509Sore with trusted certs
         store = crypto.X509Store()
-        # store.add_cert(crypto.load_certificate(crypto.FILETYPE_PEM, open(ROOT_CERT, 'r').read()))
         path = "./certs_dev/"
-        #print os.listdir(path)
         for c in os.listdir(path):
             pem = open(path + c, 'r').read()
-            #print c
             store.add_cert(crypto.load_certificate(crypto.FILETYPE_PEM, pem))
 
         # Now we add the crls to the X509 store
