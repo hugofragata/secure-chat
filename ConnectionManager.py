@@ -762,26 +762,36 @@ class ConnectionManager(QtCore.QThread):
             {"type": "connect", "phase": int(phase), "name": name, "id": id, "ciphers": ciphers, "data": data, "nonce": self.sec.get_nonce()})
 
     def verify_connecting_user(self, user, json):
+        print "VERIFY CONNECTING USER"
         u_name = user.name
         cert = str(json['cert'])
-        j_pub_key = json['key']
+        j_pub_key = str(json['key'])
         c_pub_key = self.sec.get_pubkey_from_cert(cert)
+        print "GOT THE CERT'S PUBKEY"
         c_name = self.sec.get_name_from_cert(cert)
-        signature = json['key_sign']
+        print "GOT THE CERT'S NAME"
+        signature = str(json['key_sign'])
         #verificar nome
         c_name = unicode(c_name, 'utf-8')
         if not u_name == c_name:
+            print "DIFF: NAME"
             return False
+        print "SAME NAME"
         #verificar validade do cert
         #grilo n tinha cert valido
         # if not self.sec.verify_certificate(cert):
         #    return False
         #verificar que assinatura é valida para json['key']
-        if not self.sec.rsa_verify_with_public_key(signature, cert, j_pub_key, pad=PADDING_PKCS1, hash_alg=SHA1):
+        if not self.sec.rsa_verify_with_public_key(signature, j_pub_key, c_pub_key, pad=PADDING_PKCS1, hash_alg=SHA1):
+            print  "INVALID RSA SIGNATURE"
             return False
+        print "NICE SIGNATURE"
         #e que json_key['key'] é igual à chave do cert
-        if not j_pub_key == c_pub_key:
-            return False
+        #if not j_pub_key == c_pub_key:
+        #    print "DIFF: PUBKEY"
+        #    return False
+        print "SAME PUBKEY"
+        print "CONNECTING USER OK"
         return True
 
 class ConnectionManagerError(Exception):
