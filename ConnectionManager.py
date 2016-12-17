@@ -656,7 +656,8 @@ class ConnectionManager(QtCore.QThread):
         if not u_name == c_name:
             return False
         #verificar validade do cert
-        self.sec.verify_certificate(cert)
+        if not self.sec.verify_certificate(cert):
+            return False
         #verificar que assinatura é valida para json['key']
         if not self.sec.rsa_verify_with_public_key(signature, cert, j_pub_key, pad=PADDING_PKCS1, hash_alg=SHA1):
             return False
