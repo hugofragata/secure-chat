@@ -409,7 +409,7 @@ class ConnectionManager(QtCore.QThread):
                 self.send_client_disconnect(ccj['src'])
                 return
             if self.peers[ccj['src']].connection_state != 2:
-                del self.self.peers[ccj['src']]
+                del self.peers[ccj['src']]
                 self.emit(self.error_signal, "Erro a ligar ao utilizador!")
                 self.send_client_disconnect(ccj['src'])
                 return
@@ -454,11 +454,11 @@ class ConnectionManager(QtCore.QThread):
                 self.send_client_disconnect(ccj['src'])
                 return
             if self.peers[ccj['src']].connection_state != 2:
-                del self.self.peers[ccj['src']]
+                del self.peers[ccj['src']]
                 self.send_client_disconnect(ccj['src'])
                 return
             if ccj['data'] == "not supported":
-                del self.self.peers[ccj['src']]
+                del self.peers[ccj['src']]
                 self.send_client_disconnect(ccj['src'])
                 return
             if ccj['data'] == "ok b0ss":
@@ -467,12 +467,12 @@ class ConnectionManager(QtCore.QThread):
                 try:
                     cert_and_key = json.loads(ccj['data'])
                 except:
-                    del self.self.peers[ccj['src']]
+                    del self.peers[ccj['src']]
                     self.send_client_disconnect(ccj['src'])
                     return
-                if not self.verify_connecting_user(self.self.peers[ccj['src']], cert_and_key):
+                if not self.verify_connecting_user(self.peers[ccj['src']], cert_and_key):
                     print "ERROR invalid certificate, phase 3"
-                    del self.self.peers[ccj['src']]
+                    del self.peers[ccj['src']]
                     self.send_client_disconnect(ccj['src'])
                     return
                 self.peers[ccj['src']].ccauth = True
