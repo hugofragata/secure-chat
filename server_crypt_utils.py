@@ -249,7 +249,6 @@ def get_hash(text):
     digest.update(text)
     return digest.finalize()
 
-
 def get_nonce(length=16):
     return ''.join([str(random.SystemRandom().randint(0, 9)) for i in range(length)])
 

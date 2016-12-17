@@ -154,7 +154,9 @@ class security:
         store.add_cert(certificate)
         try:
             crypto.X509StoreContext(store, certificate).verify_certificate()
-        except crypto.X509StoreContextError:
+        except crypto.X509StoreContextError as e:
+            print "***"
+            print e
             return False
         else:
             return True
@@ -210,6 +212,16 @@ class security:
         pem = crypto.dump_publickey(crypto.FILETYPE_PEM, certificate.get_pubkey())
         return self.rsa_public_pem_to_key(pem)
 
+    def get_name_from_cert(self, cert, type="PEM"):
+        certificate = None
+        if type == "ASN1":
+            certificate = crypto.load_certificate(crypto.FILETYPE_ASN1, cert)
+        elif type == "PEM":
+            certificate = crypto.load_certificate(crypto.FILETYPE_PEM, cert)
+        subj = certificate.get_subject()
+        for l in subj.get_components():
+            if l[0] == "CN":
+                return l[1]
 ################
 # Symmetric cryptography functions
 ################

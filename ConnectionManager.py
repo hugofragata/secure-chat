@@ -645,6 +645,25 @@ class ConnectionManager(QtCore.QThread):
         return json.dumps(
             {"type": "connect", "phase": int(phase), "name": name, "id": id, "ciphers": ciphers, "data": data, "nonce": self.sec.get_nonce()})
 
+    def verify_connecting_user(self, user, json):
+        u_name = user.name
+        cert = json['cert']
+        j_pub_key = json['key']
+        c_pub_key = self.sec.get_pubkey_from_cert(cert)
+        c_name = self.sec.get_name_from_cert(cert)
+        signature = json['key_sign']
+        #verificar nome
+        if not u_name == c_name:
+            return False
+        #verificar validade do cert
+        self.sec.verify_certificate(cert)
+        #verificar que assinatura é valida para json['key']
+        if not self.sec.rsa_verify_with_public_key(signature, cert, j_pub_key, pad=PADDING_PKCS1, hash_alg=SHA1):
+            return False
+        #e que json_key['key'] é igual à chave do cert
+        if not j_pub_key == c_pub_key:
+            return False
+        return True
 
 class ConnectionManagerError(Exception):
     pass
