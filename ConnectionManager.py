@@ -666,10 +666,6 @@ class ConnectionManager(QtCore.QThread):
         secure_msg = {'type': 'secure', 'sa-data': 'aa', 'payload': ciphered_pl}
         self.send_message(json.dumps(secure_msg))
 
-    def verify_connecting_user(self, user, data):
-        if not self.sec.verify_certificate(data['cert']):
-            return False
-
     def start_client_connect(self, dst, cipher_suite=1):
         if dst == self.peer_connected:
             return
