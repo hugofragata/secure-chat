@@ -15,7 +15,7 @@ from cryptography.fernet import InvalidToken
 from server_crypt_utils import *
 
 # Server address
-HOST = ""   # All available interfaces
+HOST = "192.168.0.104"   # All available interfaces
 PORT = 8081  # The server port
 
 BUFSIZE = 512 * 1024
@@ -196,6 +196,7 @@ class Server:
         del self.clients[client.socket]
         client.close()
         logging.info("Client deleted: %s", client)
+        self.broadcast_new_list(None)
 
     def accept(self):
         """Accept a new connection.
@@ -320,6 +321,8 @@ class Server:
     def processConnect(self, sender, request, inText):
         """
         Process a connect message from a client
+        :param sender: The sender of the request
+        :type sender: Client
         """
         if sender.state == STATE_CONNECTED:
             logging.warning("Client is already connected: %s" % sender)
@@ -411,7 +414,6 @@ class Server:
         if sender.state != STATE_CONNECTED:
             logging.warning("LIST from disconnected client: %s" % sender)
             return
-
         if sender.level != 200:
             return
 
@@ -455,12 +457,10 @@ class Server:
         if not 'type' in payload_json.keys():
             logging.warning("Secure message without inner frame type")
             return
-
         if payload_json['type'] == 'list':
             self.processList(sender)
             return
-
-        if not all (k in payload_json.keys() for k in ("src", "dst")):
+        if not all(k in payload_json.keys() for k in ("src", "dst")):
             return
 
         if not payload_json['dst'] in self.id2client.keys():
@@ -469,12 +469,9 @@ class Server:
 
         dst = self.id2client[payload_json['dst']]
         if not sender.permission_to_write(dst) or not dst.permission_to_read(sender):
+            logging.warning(str(payload_json['src']) + " no permission to dst:" + str(payload_json['dst']))
             return
         self.send_secure(plainText_payload, dst)
-        # pl_to_user = json.dumps({'sign': sign_data(plainText_payload), 'data': plainText_payload})
-        # ciphered_pl_to_peer = base64.encodestring(self.sec.encrypt_with_symmetric(pl_to_user, dst.sa_data))
-        # dst_message = {'type': 'secure', 'sa-data': 'not used', 'payload': ciphered_pl_to_peer}
-        # dst.send(dst_message)
 
     def connect_phase3(self, sender, request):
         if sender.cipher_suite == SUPPORTED_CIPHER_SUITES[0]:

@@ -167,7 +167,7 @@ class AppChat(QtGui.QMainWindow, t.Ui_MainWindow):
 
     def updateChat(self, text):
         if repr(text) == repr('/\x00t\x00o\x00p\x00'):
-            self.messages.append([self.comm.peers[self.comm.peer_connected].name + "> <p><img src=\"a.png\"/></p>", self.comm.peers[self.comm.peer_connected].name, None])
+            self.messages.append(["<p><img src=\"a.png\"/></p>", self.comm.peers[self.comm.peer_connected].name, None])
             self.textBrowser.append(self.comm.peers[self.comm.peer_connected].name + "> <p><img src=\"a.png\"/></p>")
         else:
             self.messages.append([text, self.comm.peers[self.comm.peer_connected].name, None])

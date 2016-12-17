@@ -2,7 +2,6 @@
 import socket
 from select import *
 import threading
-import time
 from User import User, SuperUser
 from PyQt4 import QtCore
 from security import *
@@ -375,12 +374,9 @@ class ConnectionManager(QtCore.QThread):
             print "already connected"
             return
         if ccj['phase'] == 1:
-            print "phase 1 \n\n\n\n\n\n\n\n"
-            print ccj
             if ccj['src'] not in self.peers:
                 self.peers[ccj['src']] = User(ccj['data'], uid=ccj['src'])
             elif self.peers[ccj['src']].connection_state != 1:
-                print "----------------------------------------state"
                 del self.peers[ccj['src']]
                 self.send_client_disconnect(ccj['src'])
                 return
@@ -398,17 +394,9 @@ class ConnectionManager(QtCore.QThread):
             else:
                 data = self.user.name
             self.send_client_connect(data, ccj, 2, ci)
-            # msg = json.dumps(
-            #    {"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": ccj['src'],
-            #     "phase": 2, "ciphers": ci, "data": data})
-            # ciphered_pl = base64.encodestring(self.sec.encrypt_with_symmetric(msg, self.user.sa_data))
-            # secure_msg = {'type': 'secure', 'sa-data': 'aa', 'payload': ciphered_pl}
-            # self.send_message(json.dumps(secure_msg))
             self.peers[ccj['src']].connection_state = 2
 
         elif ccj['phase'] == 2:
-            print "phase 2 \n\n\n\n\n\n\n\n"
-            print ccj
             if ccj['src'] not in self.peers:
                 self.emit(self.error_signal, "Erro a ligar ao utilizador!")
                 self.send_client_disconnect(ccj['src'])
@@ -447,16 +435,8 @@ class ConnectionManager(QtCore.QThread):
                 self.peers[ccj['src']].cipher_suite = ccj['ciphers']
                 self.peers[ccj['src']].connection_state = 3
             self.send_client_connect(data, ccj, 3, ccj['ciphers'])
-            # msg = json.dumps(
-            #    {"type": "client-connect", 'id': self.sec.get_nonce(), "src": self.user.id, "dst": ccj['src'],
-            #     "phase": 3, "ciphers": ccj['ciphers'], "data": data})
-            # ciphered_pl = base64.encodestring(self.sec.encrypt_with_symmetric(msg, self.user.sa_data))
-            # secure_msg = {'type': 'secure', 'sa-data': 'aa', 'payload': ciphered_pl}
-            # self.send_message(json.dumps(secure_msg))
 
         elif ccj['phase'] == 3:
-            print "phase 3 \n\n\n\n\n\n\n\n"
-            print ccj
             if ccj['src'] not in self.peers:
                 self.send_client_disconnect(ccj['src'])
                 return
@@ -496,8 +476,6 @@ class ConnectionManager(QtCore.QThread):
             self.peers[ccj['src']].connection_state = 3
 
         elif ccj['phase'] == 4:
-            print "phase 4 \n\n\n\n\n\n\n\n"
-            print ccj
             if ccj['src'] not in self.peers:
                 self.emit(self.error_signal, "Erro a ligar ao utilizador!")
                 self.send_client_disconnect(ccj['src'])
@@ -769,29 +747,21 @@ class ConnectionManager(QtCore.QThread):
         c_pub_key = self.sec.get_pubkey_from_cert(cert)
         print "GOT THE CERT'S PUBKEY"
         c_name = self.sec.get_name_from_cert(cert)
-        print "GOT THE CERT'S NAME"
         signature = str(json['key_sign'])
-        #verificar nome
+        print "GOT THE CERT'S NAME"
+        # verificar nome
         c_name = unicode(c_name, 'utf-8')
         if not u_name == c_name:
             print "DIFF: NAME"
             return False
-        print "SAME NAME"
-        #verificar validade do cert
-        #grilo n tinha cert valido
-        # if not self.sec.verify_certificate(cert):
-        #    return False
-        #verificar que assinatura é valida para json['key']
-        if not self.sec.rsa_verify_with_public_key(signature, j_pub_key, c_pub_key, pad=PADDING_PKCS1, hash_alg=SHA1):
-            print  "INVALID RSA SIGNATURE"
+        # verificar validade do cert
+        if not self.sec.verify_certificate(cert):
+            print "INVALID CERT"
             return False
-        print "NICE SIGNATURE"
-        #e que json_key['key'] é igual à chave do cert
-        #if not j_pub_key == c_pub_key:
-        #    print "DIFF: PUBKEY"
-        #    return False
-        print "SAME PUBKEY"
-        print "CONNECTING USER OK"
+        # verificar que assinatura é valida para json['key']
+        if not self.sec.rsa_verify_with_public_key(signature, j_pub_key, c_pub_key, pad=PADDING_PKCS1, hash_alg=SHA1):
+            print "INVALID SIGNATURE"
+            return False
         return True
 
 class ConnectionManagerError(Exception):
